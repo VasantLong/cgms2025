@@ -1,12 +1,24 @@
+import { useNavigate } from "react-router-dom";
+import CourseTable from "./CourseTable";
+
 function CourseList(props) {
+  let navigate = useNavigate();
+
   return (
     <div className="paper">
       <div className="paper-head">
-        <div id="new-btn" className="btn">
+        <button
+          className="btn"
+          onClick={() => {
+            navigate("/course/new");
+          }}
+        >
           新建课程
-        </div>
+        </button>
       </div>
-      <div className="paper-body">课程</div>
+      <div className="paper-body">
+        <CourseTable />
+      </div>
     </div>
   );
 }
