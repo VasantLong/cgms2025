@@ -82,7 +82,7 @@ async def new_student(student: Student) -> Student:
             student.model_dump(),
         )
         row = db.fetchone()
-        student.stu_sn = row.sn
+        student.stu_sn = row.sn # type: ignore
 
     return student
 

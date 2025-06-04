@@ -1,4 +1,3 @@
-
 export { default as StudentHome } from "./StudentHome";
 
 export { default as StudentList } from "./StudentList";

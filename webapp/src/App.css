@@ -1,136 +1,135 @@
 body {
-    margin: 0;
-    overflow-y: hidden;
+  margin: 0;
+  overflow-y: hidden;
 }
 
 #root {
-    display: grid;
-    grid-template-columns: 10rem 1fr;
-    grid-template-rows: 4rem 1fr 2rem;
-    grid-template-areas:
-        "header header"
-        "sidebar main"
-        "sidebar footer";
+  display: grid;
+  grid-template-columns: 10rem 1fr;
+  grid-template-rows: 4rem 1fr 2rem;
+  grid-template-areas:
+    "header header"
+    "sidebar main"
+    "sidebar footer";
 
-    width: 100vw;
-    height: 100vh;
+  width: 100vw;
+  height: 100vh;
 }
 
 .page-header {
-    grid-area: header;
+  grid-area: header;
 }
 
 .page-sidebar {
-    grid-area: sidebar;
+  grid-area: sidebar;
 }
 
 .page-body {
-    grid-area: main;
+  grid-area: main;
 }
 
 .page-footer {
-    grid-area: footer;
+  grid-area: footer;
 }
 
 .page-header {
-    background-color: hsl(306, 40%, 25%);
-    box-shadow: 0px 2px 5px 0px hsl(307, 38%, 21%);
-    z-index: 1;
+  background-color: hsl(306, 40%, 25%);
+  box-shadow: 0px 2px 5px 0px hsl(307, 38%, 21%);
+  z-index: 1;
 
-    display: flex;
-    align-items: center;
+  display: flex;
+  align-items: center;
 }
 
 .page-header > .logo {
-    width: 3.5rem;
-    height: 3.5rem;
-    margin-left: 1rem;
-    margin-right: 1rem;
+  width: 3.5rem;
+  height: 3.5rem;
+  margin-left: 1rem;
+  margin-right: 1rem;
 }
 
 .page-header > .title {
-    font-size: 2.1rem;
-    color: #eee;
+  font-size: 2.1rem;
+  color: #eee;
 
-    font-weight: bolder;
+  font-weight: bolder;
 
-    letter-spacing: 0.15em;
-    user-select: none;
+  letter-spacing: 0.15em;
+  user-select: none;
 }
 
 .page-footer {
-    line-height: 2;
-    color: #999;
-    margin-top: 1em;
-    text-align: center;
+  line-height: 2;
+  color: #999;
+  margin-top: 1em;
+  text-align: center;
 }
 
 .page-sidebar {
-    background-color: hsl(307, 38%, 85%);
+  background-color: hsl(307, 38%, 85%);
 }
 
 .page-sidebar > ul {
-    list-style: none;
-    margin-block-start: unset;
-    margin-block-end: unset;
-    padding-inline-start: unset;
-    padding-top: 1rem;
-    padding-left: 1rem;
+  list-style: none;
+  margin-block-start: unset;
+  margin-block-end: unset;
+  padding-inline-start: unset;
+  padding-top: 1rem;
+  padding-left: 1rem;
 
-    font-size: 2.1rem;
+  font-size: 2.1rem;
 }
 
 .page-sidebar > ul > li {
-    color: hsl(306, 40%, 25%);
-    display: flex;
+  color: hsl(306, 40%, 25%);
+  display: flex;
 }
 
 .page-sidebar > ul > li > a {
-    flex: 1 1;
-    display: block;
+  flex: 1 1;
+  display: block;
 
-    letter-spacing: 0.1em;
-    padding: 0.1em 0.5em;
+  letter-spacing: 0.1em;
+  padding: 0.1em 0.5em;
 
-    user-select: none;
-    text-decoration: none;
+  user-select: none;
+  text-decoration: none;
 
-    position: relative;
+  position: relative;
 }
 
 .page-sidebar > ul > li > a:link,
 .page-sidebar > ul > li > a:visited {
-    color: unset;
+  color: unset;
 }
 
 .page-sidebar > ul > li > a:hover {
-    background-color: hsl(307, 38%, 65%);
-    color: #eee;
+  background-color: hsl(307, 38%, 65%);
+  color: #eee;
 }
 
 .page-sidebar > ul > li > a.active {
-    background-color: hsl(307, 38%, 75%);
+  background-color: hsl(307, 38%, 75%);
 }
 
 .page-sidebar > ul > li > a.active::after {
-    content: " ";
-    position: absolute;
+  content: " ";
+  position: absolute;
 
-    width: 0;
-    height: 0;
-    right: 0;
-    margin: 5px 0px;
-    border-top: 0.5em solid transparent;
-    border-bottom: 0.5em solid transparent;
-    border-right: 0.5em solid hsl(307, 38%, 90%);;
+  width: 0;
+  height: 0;
+  right: 0;
+  margin: 5px 0px;
+  border-top: 0.5em solid transparent;
+  border-bottom: 0.5em solid transparent;
+  border-right: 0.5em solid hsl(307, 38%, 90%);
 }
 
 .page-body {
-    min-height: calc(100vh - 4rem);
-    position: relative;
+  min-height: calc(100vh - 4rem);
+  position: relative;
 
-    background-color: hsl(307, 38%, 90%);
+  background-color: hsl(307, 38%, 90%);
 
-
-    overflow-y: overlay;
+  overflow-y: overlay;
 }
