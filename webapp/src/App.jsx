@@ -1,9 +1,9 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import { StudentHome, StudentList, StudentEdit, StudentNew } from "./student";
+import { CourseHome, CourseList, CourseEdit, CourseNew } from "./course";
 
 import GradeList from "./grade/GradeList";
-import CourseList from "./course/CourseList";
 import NaviMenu from "./NaviMenu";
 import "./components.css";
 import "./App.css";
@@ -29,12 +29,16 @@ function App() {
               <Route path="new" element={<StudentNew />} />
               <Route path=":stuSn" element={<StudentEdit />} />
             </Route>
-            <Route path="/course/list" element={<CourseList />} />
+            <Route path="/course" element={<CourseHome />}>
+              <Route path="list" element={<CourseList />} />
+              <Route path="new" element={<CourseNew />} />
+              <Route path=":courseSn/edit" element={<CourseEdit />} />
+            </Route>
             <Route path="*" element={<GradeList />} />
           </Routes>
         </div>
         <div className="page-footer">
-          &copy; 天津工业大学经济与管理学院 2020
+          &copy; 天津工业大学经济与管理学院 2025
         </div>
       </div>
     </BrowserRouter>

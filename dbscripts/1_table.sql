@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS course  (
     sn       INTEGER,     --序号
     no       VARCHAR(10), --课程号
     name     TEXT,        --课程名称
+    credit   NUMERIC(5,2),--学分
+    hours    INTEGER,     --学时
+    semester VARCHAR(11), --开课学期
     PRIMARY KEY(sn)
 );
 CREATE SEQUENCE seq_course_sn 
