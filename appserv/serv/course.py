@@ -1,0 +1,116 @@
+import asyncio
+from dataclasses import asdict
+from fastapi import status
+import datetime as dt
+from fastapi import HTTPException
+
+from pydantic import BaseModel
+from .config import app, dblock
+from .error import ConflictError, InvalidError
+
+
+class Course(BaseModel):
+    course_sn: int | None
+    course_no: str
+    course_name: str
+    credit: float | None
+    hours: int | None
+    semester: str | None
+
+
+@app.get("/api/course/list")
+async def get_course_list() -> list[Course]:
+    with dblock() as db:
+        db.execute("""
+        SELECT sn AS course_sn, no AS course_no, name AS course_name, credit, hours, semester 
+        FROM course
+        ORDER BY no, name
+        """)
+        data = [Course(**asdict(row)) for row in db]
+
+    return data
+
+
+@app.get("/api/course/{course_sn}")
+async def get_course_profile(course_sn) -> Course:
+    with dblock() as db:
+        db.execute(
+            """
+            SELECT sn AS course_sn, no AS course_no, name AS course_name, credit, hours, semester 
+            FROM course WHERE sn=%(course_sn)s
+            """,
+            dict(course_sn=course_sn),
+        )
+        row = db.fetchone()
+
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"无此课程(sn={course_sn})"
+        )
+
+    return row
+
+
+@app.post("/api/course", status_code=status.HTTP_201_CREATED)
+async def new_course(course: Course) -> Course:
+    if not course.semester:
+        course.semester = "2023-2024-1"
+
+    course_no = course.course_no
+    if len(course_no.strip()) != 3:
+        raise InvalidError(f"课程号'{course_no}'需按照3位编号编制")
+
+    with dblock() as db:
+        db.execute(
+            """
+            SELECT sn AS course_sn, name AS course_name FROM course
+            WHERE no=%(course_no)s
+            """,
+            dict(course_no=course_no),
+        )
+        record = db.fetchone()
+        if record:
+            raise ConflictError(
+                f"课程号'{course_no}'已被{record.course_name}(#{record.course_sn}占用"
+            )
+
+        db.execute(
+            """
+            INSERT INTO course (no, name, credit, hours, semester)
+            VALUES(%(course_no)s, %(course_name)s, %(credit)s, %(hours)s, %(semester)s) 
+            RETURNING sn""",
+            course.model_dump(),
+        )
+        row = db.fetchone()
+        course.course_sn = row.sn # type: ignore
+
+    return course
+
+
+@app.put("/api/course/{course_sn}")
+async def update_course(course_sn: int, course: Course):
+    if not course.semester:
+        course.semester = "2023-2024-1"
+
+    assert course.course_sn == course_sn
+
+    course_no = course.course_no
+    if len(course_no.strip()) != 3:
+        raise InvalidError(f"课程号'{course_no}'需按照3位编号编制")
+
+    with dblock() as db:
+        db.execute(
+            """
+            UPDATE course SET
+                no=%(course_no)s, name=%(course_name)s, 
+                credit=%(credit)s, hours=%(hours)s, semester=%(semester)s
+            WHERE sn=%(course_sn)s;
+            """,
+            course.model_dump(),
+        )
+
+
+@app.delete("/api/course/{course_sn}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_course(course_sn):
+    with dblock() as db:
+        db.execute("DELETE FROM course WHERE sn=%(course_sn)s", {"course_sn": course_sn})
