@@ -48,7 +48,9 @@ CREATE TABLE IF NOT EXISTS course  (
     UNIQUE (no)                -- 课程号唯一
 );
 
+
 CREATE SEQUENCE seq_course_sn 
+    START 20000 INCREMENT 1 OWNED BY course.sn;
     START 20000 INCREMENT 1 OWNED BY course.sn;
 ALTER TABLE course ALTER sn 
 <<<<<<< HEAD
