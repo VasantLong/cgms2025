@@ -17,7 +17,7 @@ export default function GradeList(props) {
   return (
     <div className="paper">
       <div className="paper-body">
-        <table class="table">
+        <table className="table">
           <thead>
             <tr>
               <th>姓名</th>
