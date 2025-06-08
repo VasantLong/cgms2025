@@ -3,13 +3,21 @@ DROP TABLE IF EXISTS student;
 CREATE TABLE IF NOT EXISTS student  (
     sn       INTEGER,           -- 自增序号（从10000开始）
     no       VARCHAR(10)        -- 学号（格式：230650118）
+<<<<<<< HEAD
         CHECK (no ~ '^\d{9}$'), -- 8位数字校验 运用了正则表达式
+=======
+        CHECK (no ~ '^\d{9}$'), -- 8位数字校验
+>>>>>>> f70d0a310dfb2821361ba1a5d92adc7f260b8da0
     name     TEXT NOT NULL,
     gender   CHAR(1)            -- 性别F/M/O
         CHECK (gender IN ('F', 'M', 'O')),
     enrollment_date DATE        -- 入学日期
         CHECK (enrollment_date > '2000-01-01'), -- 合理范围校验
+<<<<<<< HEAD
     PRIMARY KEY (sn),--主键
+=======
+    PRIMARY KEY (sn),
+>>>>>>> f70d0a310dfb2821361ba1a5d92adc7f260b8da0
     UNIQUE (no)                 -- 学号唯一
 );
 
@@ -32,19 +40,31 @@ CREATE TABLE IF NOT EXISTS course  (
         CHECK (credit > 0),
     hours    INTEGER           -- 学时
         CHECK (hours > 0),
+<<<<<<< HEAD
     PRIMARY KEY (sn),      --主键与外键相连
+=======
+    PRIMARY KEY (sn),
+>>>>>>> f70d0a310dfb2821361ba1a5d92adc7f260b8da0
     UNIQUE (no)                -- 课程号唯一
 );
 
 CREATE SEQUENCE seq_course_sn 
     START 20000 INCREMENT 1 OWNED BY course.sn;
 ALTER TABLE course ALTER sn 
+<<<<<<< HEAD
     SET DEFAULT nextval('seq_course_sn');--获取序列，让序列按规则生成递增
+=======
+    SET DEFAULT nextval('seq_course_sn');
+>>>>>>> f70d0a310dfb2821361ba1a5d92adc7f260b8da0
 -- CREATE UNIQUE INDEX idx_course_no ON course(no);
 
 
 
+<<<<<<< HEAD
 --  班次表创建与配置
+=======
+-- === 班次表
+>>>>>>> f70d0a310dfb2821361ba1a5d92adc7f260b8da0
 DROP TABLE IF EXISTS class;
 CREATE TABLE IF NOT EXISTS class  (
     sn       INTEGER,          -- 自增序号（从30000开始）
@@ -72,7 +92,11 @@ CREATE TABLE IF NOT EXISTS class_grade  (
     id       SERIAL PRIMARY KEY,  -- 自增主键（便于单独操作记录）
     stu_sn   INTEGER NOT NULL,    -- 学生序号（关联student.sn）
     class_sn INTEGER NOT NULL,    -- 班次序号（关联class.sn）
+<<<<<<< HEAD
     grade    NUMERIC(5,2)         -- 成绩（允许NULL表示未录入） 总位数5为 小数位两位
+=======
+    grade    NUMERIC(5,2)         -- 成绩（允许NULL表示未录入）
+>>>>>>> f70d0a310dfb2821361ba1a5d92adc7f260b8da0
         CHECK (grade BETWEEN 0 AND 100 OR grade IS NULL),
     -- 唯一约束：一个学生在同一班次只能有一条成绩记录
     UNIQUE (stu_sn, class_sn),
@@ -81,7 +105,10 @@ CREATE TABLE IF NOT EXISTS class_grade  (
         REFERENCES student(sn) ON DELETE CASCADE,
     CONSTRAINT fk_class FOREIGN KEY (class_sn) 
         REFERENCES class(sn) ON DELETE CASCADE
+<<<<<<< HEAD
 
+=======
+>>>>>>> f70d0a310dfb2821361ba1a5d92adc7f260b8da0
 );
 
 -- 为常用查询添加索引
