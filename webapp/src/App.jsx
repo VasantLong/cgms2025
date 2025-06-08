@@ -2,8 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import { StudentHome, StudentList, StudentEdit, StudentNew } from "./student";
 import { CourseHome, CourseList, CourseEdit, CourseNew } from "./course";
-
-import GradeList from "./grade/GradeList";
+import { GradeHome, GradeList, GradeEdit } from "./grade";
 import NaviMenu from "./NaviMenu";
 import "./components.css";
 import "./App.css";
@@ -23,7 +22,6 @@ function App() {
         <div className="page-content">
           {/* 根据URL导航路径匹配相应业务功能组件 */}
           <Routes>
-            <Route path="/grade/list" element={<GradeList />} />
             <Route path="/student" element={<StudentHome />}>
               <Route path="list" element={<StudentList />} />
               <Route path="new" element={<StudentNew />} />
@@ -33,6 +31,13 @@ function App() {
               <Route path="list" element={<CourseList />} />
               <Route path="new" element={<CourseNew />} />
               <Route path=":courseSn/edit" element={<CourseEdit />} />
+            </Route>
+            <Route path="/grade" element={<GradeHome />}>
+              <Route path="list" element={<GradeList />} />
+              <Route
+                path="student/:stuSn/course/:courseSn"
+                element={<GradeEdit />}
+              />
             </Route>
             <Route path="*" element={<GradeList />} />
           </Routes>
