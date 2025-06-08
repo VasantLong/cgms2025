@@ -4,7 +4,7 @@ from fastapi import status
 import datetime as dt
 from fastapi import HTTPException
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from .config import app, dblock
 from .error import ConflictError, InvalidError
 
@@ -14,14 +14,26 @@ class Student(BaseModel):
     stu_no: str
     stu_name: str
     gender: str | None
-    enrolled: dt.date | None
+    enrollment_date: dt.date | None
+
+    @field_validator('stu_no')
+    def validate_stu_no(cls, v):
+        if not v.isdigit() or len(v) != 9:
+            raise ValueError("学号必须为9位数字")
+        return v
+
+    @field_validator('enrollment_date')
+    def validate_enrollment_date_date(cls, v):
+        if v and v < dt.date(2000, 1, 1):
+            raise ValueError("入学日期必须在2000年1月1日之后")
+        return v
 
 
 @app.get("/api/student/list")
 async def get_student_list() -> list[Student]:
     with dblock() as db:
         db.execute("""
-        SELECT sn AS stu_sn, no AS stu_no, name AS stu_name, gender, enrolled 
+        SELECT sn AS stu_sn, no AS stu_no, name AS stu_name, gender, enrollment_date 
         FROM student
         ORDER BY no, name
         """)
@@ -35,7 +47,7 @@ async def get_student_profile(stu_sn) -> Student:
     with dblock() as db:
         db.execute(
             """
-            SELECT sn AS stu_sn, no AS stu_no, name AS stu_name, gender, enrolled 
+            SELECT sn AS stu_sn, no AS stu_no, name AS stu_name, gender, enrollment_date 
             FROM student WHERE sn=%(stu_sn)s
             """,
             dict(stu_sn=stu_sn),
@@ -52,12 +64,7 @@ async def get_student_profile(stu_sn) -> Student:
 
 @app.post("/api/student", status_code=status.HTTP_201_CREATED)
 async def new_student(student: Student) -> Student:
-    if not student.enrolled:
-        student.enrolled = dt.date(1900, 1, 1)
-
     stu_no = student.stu_no
-    if len(stu_no.strip()) != 4:
-        raise InvalidError(f"学号'{stu_no}'需按照4位学号编制")
 
     with dblock() as db:
         db.execute(
@@ -76,13 +83,13 @@ async def new_student(student: Student) -> Student:
         # with dblock() as db:  # 思考：为什么此处不能另起一个连接或事务
         db.execute(
             """
-            INSERT INTO student (no, name, gender, enrolled)
-            VALUES(%(stu_no)s, %(stu_name)s, %(gender)s, %(enrolled)s) 
+            INSERT INTO student (no, name, gender, enrollment_date)
+            VALUES(%(stu_no)s, %(stu_name)s, %(gender)s, %(enrollment_date)s) 
             RETURNING sn""",
             student.model_dump(),
         )
         row = db.fetchone()
-        student.stu_sn = row.sn # type: ignore
+        student.stu_sn = row.sn  # type: ignore
 
     return student
 
@@ -91,21 +98,16 @@ async def new_student(student: Student) -> Student:
 
 @app.put("/api/student/{stu_sn}")
 async def update_student(stu_sn: int, student: Student):
-    if not student.enrolled:
-        student.enrolled = dt.date(1900, 1, 1)
-
     assert student.stu_sn == stu_sn
 
     stu_no = student.stu_no
-    if len(stu_no.strip()) != 4:
-        raise InvalidError(f"学号'{stu_no}'需按照4位学号编制")
 
     with dblock() as db:
         db.execute(
             """
             UPDATE student SET
                 no=%(stu_no)s, name=%(stu_name)s, 
-                gender=%(gender)s, enrolled=%(enrolled)s
+                gender=%(gender)s, enrollment_date=%(enrollment_date)s
             WHERE sn=%(stu_sn)s;
             """,
             student.model_dump(),
