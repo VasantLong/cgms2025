@@ -21,7 +21,7 @@ function StudentDetail(props) {
     elements.stu_no.value = stuinfo.stu_no ?? "";
     elements.stu_name.value = stuinfo.stu_name ?? "";
     elements.gender.value = stuinfo.gender ?? null;
-    elements.enrolled.value = stuinfo.enrolled ?? null;
+    elements.enrollment_date.value = stuinfo.enrollment_date ?? null;
 
     setDirty(false);
   }, [stuinfo]);
@@ -34,7 +34,7 @@ function StudentDetail(props) {
       return;
     }
 
-    for (let fieldName of ["stu_no", "stu_name", "gender", "enrolled"]) {
+    for (let fieldName of ["stu_no", "stu_name", "gender", "enrollment_date"]) {
       if (stuinfo[fieldName] !== formRef.current.elements[fieldName].value) {
         if (!isDirty) setDirty(true);
         return;
@@ -55,8 +55,23 @@ function StudentDetail(props) {
       stu_no: elements.stu_no.value,
       stu_name: elements.stu_name.value,
       gender: elements.gender.value,
-      enrolled: elements.enrolled.value,
+      enrollment_date: elements.enrollment_date.value,
     };
+
+    // todo:和coursedetail的验证方式有所不同
+    // 前端验证：学号必须为9位数字
+    if (!/^\d{9}$/.test(data.stu_no)) {
+      setActionError("学号必须为9位数字");
+      return;
+    }
+    // 前端验证：入学日期必须在2000年1月1日之后
+    if (
+      data.enrollment_date &&
+      new Date(data.enrollment_date) < new Date("2000-01-01")
+    ) {
+      setActionError("入学日期必须在2000年1月1日之后");
+      return;
+    }
 
     let url, http_method;
     if (data.stu_sn === null) {
@@ -81,7 +96,7 @@ function StudentDetail(props) {
         body: JSON.stringify(data), // 将data对象序列化为JSON的字符串
       });
 
-      console.log(1111, response);
+      console.log("studetail", response);
 
       if (!response.ok) {
         // TODO: 较草率处理错误
@@ -154,7 +169,7 @@ function StudentDetail(props) {
           </div>
           <div className="field">
             <label>入学时间: </label>
-            <input type="date" name="enrolled" onChange={checkChange} />
+            <input type="date" name="enrollment_date" onChange={checkChange} />
           </div>
         </form>
       </div>

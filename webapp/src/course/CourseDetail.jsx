@@ -21,7 +21,6 @@ function CourseDetail(props) {
     elements.course_name.value = courseinfo.course_name ?? "";
     elements.credit.value = courseinfo.credit ?? null;
     elements.hours.value = courseinfo.hours ?? null;
-    elements.semester.value = courseinfo.semester ?? null;
 
     setDirty(false);
   }, [courseinfo]);
@@ -34,13 +33,7 @@ function CourseDetail(props) {
       return;
     }
 
-    for (let fieldName of [
-      "course_no",
-      "course_name",
-      "credit",
-      "hours",
-      "semester",
-    ]) {
+    for (let fieldName of ["course_no", "course_name", "credit", "hours"]) {
       if (courseinfo[fieldName] !== formRef.current.elements[fieldName].value) {
         if (!isDirty) setDirty(true);
         return;
@@ -62,7 +55,6 @@ function CourseDetail(props) {
       course_name: elements.course_name.value,
       credit: Number(elements.credit.value),
       hours: Number(elements.hours.value),
-      semester: elements.semester.value,
     };
 
     let url, http_method;
@@ -91,6 +83,7 @@ function CourseDetail(props) {
       console.log("coursedetial", response);
 
       if (!response.ok) {
+        // TODO: 较草率处理错误
         console.error(response);
         const error = await response.json();
         setActionError(error.message);
@@ -100,7 +93,7 @@ function CourseDetail(props) {
       const course = await response.json();
 
       if (courseinfo.course_sn === null) {
-        navigate(`/course/${course.course_sn}`);
+        navigate(`/course/${course.course_sn}/edit`);
         return;
       }
     } finally {
@@ -122,13 +115,21 @@ function CourseDetail(props) {
   };
 
   return (
-    <div className="paper">
-      <div className="paper-head"></div>
+    <>
       <div className="paper-body">
         <form ref={formRef}>
           <div className="field">
             <label>课程编号: </label>
-            <input type="text" name="course_no" onChange={checkChange} />
+            <input
+              type="text"
+              name="course_no"
+              onChange={(e) => {
+                checkChange(e);
+                if (!e.target.value.match(/^\d{5}$/))
+                  setActionError("detail：课程号必须为5位数字");
+                else setActionError(null);
+              }}
+            />
           </div>
           <div className="field">
             <label>课程名称: </label>
@@ -136,15 +137,29 @@ function CourseDetail(props) {
           </div>
           <div className="field">
             <label>学分: </label>
-            <input type="number" name="credit" onChange={checkChange} />
+            <input
+              type="number"
+              name="credit"
+              onChange={(e) => {
+                checkChange(e);
+                if (Number(e.target.value) <= 0)
+                  setActionError("detail：学分必须大于0");
+                else setActionError(null);
+              }}
+            />
           </div>
           <div className="field">
             <label>学时: </label>
-            <input type="number" name="hours" onChange={checkChange} />
-          </div>
-          <div className="field">
-            <label>学期: </label>
-            <input type="text" name="semester" onChange={checkChange} />
+            <input
+              type="number"
+              name="hours"
+              onChange={(e) => {
+                checkChange(e);
+                if (Number(e.target.value) <= 0)
+                  setActionError("detail：学时必须大于0");
+                else setActionError(null);
+              }}
+            />
           </div>
         </form>
       </div>
@@ -179,7 +194,7 @@ function CourseDetail(props) {
           </div>
         )}
       </div>
-    </div>
+    </>
   );
 }
 
