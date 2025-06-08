@@ -1,6 +1,5 @@
 import useSWR from "swr";
 import { fetcher } from "../utils";
-
 import { Link } from "react-router-dom";
 import "./student.css";
 
@@ -12,7 +11,7 @@ function formatGender(v) {
 
 function StudentTable(props) {
   const { data: items, error } = useSWR("/api/student/list", fetcher);
-
+  console.log("stuitems", items);
   if (error) {
     return <div>数据加载失败</div>;
   }
@@ -28,7 +27,7 @@ function StudentTable(props) {
           <th className="col-stu_name">姓名</th>
           <th className="col-stu_no">学号</th>
           <th className="col-gender">性别</th>
-          <th className="col-enrolled">入学时间</th>
+          <th className="col-enrollment_date">入学时间</th>
         </tr>
       </thead>
       <tbody>
@@ -42,7 +41,7 @@ function StudentTable(props) {
               </td>
               <td>{item.stu_no}</td>
               <td>{formatGender(item.gender)}</td>
-              <td>{item.enrolled}</td>
+              <td>{item.enrollment_date}</td>
             </tr>
           ))}
       </tbody>

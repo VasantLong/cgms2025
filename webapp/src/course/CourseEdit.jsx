@@ -3,7 +3,7 @@ import CourseDetail from "./CourseDetail";
 import useSWR from "swr";
 import { fetcher } from "../utils";
 
-function CourseEdit() {
+function CourseEdit(props) {
   // 从URL参数中获取课程编号
   const { courseSn } = useParams();
   console.log(`courseSn: ${courseSn}`);

@@ -23,7 +23,6 @@ function CourseTable(props) {
           <th className="col-course_name">课程名称</th>
           <th className="col-credit">学分</th>
           <th className="col-hours">学时</th>
-          <th className="col-semester">学期</th>
         </tr>
       </thead>
       <tbody>
@@ -38,7 +37,6 @@ function CourseTable(props) {
               <td>{item.course_name}</td>
               <td>{item.credit}</td>
               <td>{item.hours}</td>
-              <td>{item.semester}</td>
             </tr>
           ))}
       </tbody>

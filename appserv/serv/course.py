@@ -4,7 +4,7 @@ from fastapi import status
 import datetime as dt
 from fastapi import HTTPException
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from .config import app, dblock
 from .error import ConflictError, InvalidError
 
@@ -15,14 +15,31 @@ class Course(BaseModel):
     course_name: str
     credit: float | None
     hours: int | None
-    semester: str | None
+
+    @field_validator('course_no')
+    def validate_course_no(cls, v):
+        if not v.isdigit() or len(v) != 5:
+            raise ValueError("api：课程号必须为5位数字")
+        return v
+
+    @field_validator('credit')
+    def validate_credit(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError("api：学分必须大于0")
+        return v
+
+    @field_validator('hours')
+    def validate_hours(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError("api：学时必须大于0")
+        return v
 
 
 @app.get("/api/course/list")
 async def get_course_list() -> list[Course]:
     with dblock() as db:
         db.execute("""
-        SELECT sn AS course_sn, no AS course_no, name AS course_name, credit, hours, semester 
+        SELECT sn AS course_sn, no AS course_no, name AS course_name, credit, hours
         FROM course
         ORDER BY no, name
         """)
@@ -36,7 +53,7 @@ async def get_course_profile(course_sn) -> Course:
     with dblock() as db:
         db.execute(
             """
-            SELECT sn AS course_sn, no AS course_no, name AS course_name, credit, hours, semester 
+            SELECT sn AS course_sn, no AS course_no, name AS course_name, credit, hours
             FROM course WHERE sn=%(course_sn)s
             """,
             dict(course_sn=course_sn),
@@ -53,13 +70,9 @@ async def get_course_profile(course_sn) -> Course:
 
 @app.post("/api/course", status_code=status.HTTP_201_CREATED)
 async def new_course(course: Course) -> Course:
-    if not course.semester:
-        course.semester = "2023-2024-1"
-
     course_no = course.course_no
-    if len(course_no.strip()) != 3:
-        raise InvalidError(f"课程号'{course_no}'需按照3位编号编制")
-
+    #course_dict = course.model_dump()
+    #course_no = course_dict.get('course_no')
     with dblock() as db:
         db.execute(
             """
@@ -76,8 +89,8 @@ async def new_course(course: Course) -> Course:
 
         db.execute(
             """
-            INSERT INTO course (no, name, credit, hours, semester)
-            VALUES(%(course_no)s, %(course_name)s, %(credit)s, %(hours)s, %(semester)s) 
+            INSERT INTO course (no, name, credit, hours)
+            VALUES(%(course_no)s, %(course_name)s, %(credit)s, %(hours)s) 
             RETURNING sn""",
             course.model_dump(),
         )
@@ -89,23 +102,15 @@ async def new_course(course: Course) -> Course:
 
 @app.put("/api/course/{course_sn}")
 async def update_course(course_sn: int, course: Course):
-    if not course.semester:
-        course.semester = "2023-2024-1"
-
-    assert course.course_sn == course_sn
-
+    assert course_sn == course.course_sn
     course_no = course.course_no
-    if len(course_no.strip()) != 3:
-        raise InvalidError(f"课程号'{course_no}'需按照3位编号编制")
-
     with dblock() as db:
         db.execute(
             """
             UPDATE course SET
                 no=%(course_no)s, name=%(course_name)s, 
-                credit=%(credit)s, hours=%(hours)s, semester=%(semester)s
-            WHERE sn=%(course_sn)s;
-            """,
+                credit=%(credit)s, hours=%(hours)s
+            WHERE sn=%(course_sn)s;""",
             course.model_dump(),
         )
 
