@@ -20,7 +20,7 @@ ALTER TABLE student ALTER sn
 -- 学号唯一
 CREATE UNIQUE INDEX idx_student_no ON student(no);
 
--- 课程表创建与配置
+-- === 课程表
 DROP TABLE IF EXISTS course;
 CREATE TABLE IF NOT EXISTS course  (
     sn       INTEGER,          -- 自增序号（从20000开始）
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS course  (
         CHECK (credit > 0),
     hours    INTEGER           -- 学时
         CHECK (hours > 0),
-    PRIMARY KEY (sn),          --主键与外键相连
+    PRIMARY KEY (sn),
     UNIQUE (no)                -- 课程号唯一
 );
 
@@ -85,3 +85,10 @@ CREATE TABLE IF NOT EXISTS class_grade  (
 -- 为常用查询添加索引
 CREATE INDEX idx_class_grade_student ON class_grade(stu_sn);
 CREATE INDEX idx_class_grade_class ON class_grade(class_sn);
+
+-- 优化多条件查询
+CREATE INDEX idx_grade_stu_class ON class_grade(stu_sn, class_sn);
+
+-- 加速课程关联查询
+CREATE INDEX idx_class_course ON class 
+    USING BTREE (sn, cou_sn);
