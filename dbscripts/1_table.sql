@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS course  (
         CHECK (credit > 0),
     hours    INTEGER           -- 学时
         CHECK (hours > 0),
-    PRIMARY KEY (sn),
+    PRIMARY KEY (sn),          --主键与外键相连
     UNIQUE (no)                -- 课程号唯一
 );
 
