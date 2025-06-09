@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { StudentHome, StudentList, StudentEdit, StudentNew } from "./student";
 import { CourseHome, CourseList, CourseEdit, CourseNew } from "./course";
 import { GradeHome, GradeList, GradeEdit } from "./grade";
+import { ClassHome, ClassList } from "./class";
 import NaviMenu from "./NaviMenu";
 import "./components.css";
 import "./App.css";
@@ -38,6 +39,9 @@ function App() {
                 path="student/:stuSn/course/:courseSn"
                 element={<GradeEdit />}
               />
+            </Route>
+            <Route path="/class" element={<ClassHome />}>
+              <Route path="list" element={<ClassList />} />
             </Route>
             <Route path="*" element={<GradeList />} />
           </Routes>
