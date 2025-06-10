@@ -6,22 +6,17 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel
-
-from dotenv import load_dotenv
+from pydantic import BaseModel, field_validator
 import os
-import logging
 
 from .config import dblock
 from .error import ConflictError, InvalidError
 
-logger = logging.getLogger(__name__)
 
 
 
 # auth.py
 # 安全配置
-load_dotenv()  # 加载环境变量
 SECRET_KEY = os.getenv("SECRET_KEY", "fallback-weak-key-for-dev-only")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
@@ -32,15 +27,6 @@ pwd_context = CryptContext(
     deprecated="auto",
     bcrypt__rounds=12  # 增加计算成本
 )
-
-# 密码策略常量
-PASSWORD_POLICY = {
-    'min_length': 8,
-    'require_upper': True,
-    'require_lower': True,
-    'require_digit': True,
-    'max_age_days': 90  # 密码有效期
-}
 
 # OAuth2 方案
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -65,43 +51,35 @@ def verify_password(plain_password: str, hashed_password: str):
 def get_password_hash(password: str):
     return pwd_context.hash(password)
 
-async def get_user(username: str):
+async def get_user(username: str) -> Optional[User]:
     with dblock() as db:
         db.execute("""
-            SELECT user_sn, user_name 
+            SELECT user_sn, username 
             FROM sys_users 
-            WHERE user_name = %(username)s
+            WHERE username = %(username)s
             """,
             {"username": username}
         )
-        user = db.fetchone()
-    return User(**user) if user else None
-
-async def authenticate_user(username: str, password: str):
-    user = await get_user(username)
-    if not user:
-        logger.warning(f"登录尝试：用户 {username} 不存在")
-        return False
+        row = db.fetchone()
     
-    # 查询密码
+    return User(user_sn=row.user_sn, user_name=row.username) # type: ignore
+
+async def authenticate_user(username: str, password: str) -> Optional[User]:
     with dblock() as db:
         db.execute("""
-            SELECT hashed_password 
-            FROM passwords 
-            WHERE user_sn = %(user_sn)s
-            """,
-            {"user_sn": user.user_sn}
+            SELECT u.user_sn, u.username, p.hashed_password 
+            FROM sys_users u
+            JOIN user_passwords p ON u.user_sn = p.user_sn
+            WHERE u.username = %(username)s
+            """, 
+            {"username": username}
         )
-        db_password = db.fetchone()
-    if not db_password:
-        return False
+        row = db.fetchone()
     
-    # 验证对比哈希值
-    if not db_password or not verify_password(password, db_password.hashed_password): 
-        logger.warning(f"用户 {username} 密码错误")
-        return False
-
-    return user
+    if not row or not verify_password(password, row.hashed_password):
+        return None
+    
+    return User(user_sn=row.user_sn, user_name=row.username)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -111,13 +89,13 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
         expire = datetime.now(timezone.utc) + timedelta(minutes=15)
     to_encode.update({
         "exp": expire,
-        "sub": data.get("username"),
-        "user_sn": data.get("user_sn")
+        "user_sn": data.get("user_sn"),
+        "user_name": data.get("user_name")
     })
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -125,14 +103,13 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub") # type: ignore
-        if username is None:
+        username: str = payload.get("username") # type: ignore
+        if not username:
             raise credentials_exception
-        token_data = TokenData(username=username)
     except JWTError:
         raise credentials_exception
     
-    user = await get_user(username=token_data.username) # type: ignore
+    user = await get_user(username)
     if user is None:
         raise credentials_exception
     

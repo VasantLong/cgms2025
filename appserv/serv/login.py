@@ -1,5 +1,5 @@
 # main.py
-from fastapi import FastAPI, Depends, HTTPException, status, APIRouter, Body, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Body
 from fastapi.security import OAuth2PasswordRequestForm
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -16,9 +16,11 @@ from .auth import (
     User
 )
 from .config import app, dblock
-from datetime import timedelta, datetime, timezone
+from datetime import timedelta
 from .error import ConflictError, InvalidError
 
+
+ACCESS_TOKEN_EXPIRE_MINUTES = 30  # 设置访问令牌的过期时间为30分钟
 
 # 初始化限流器
 limiter = Limiter(key_func=get_remote_address)
@@ -26,6 +28,11 @@ router = APIRouter()
 
 # 定义请求体模型
 class UserCreate(BaseModel):
+    username: str
+    password: str
+
+# 修改登录接口的请求模型
+class LoginRequest(BaseModel):
     username: str
     password: str
 
@@ -39,7 +46,7 @@ async def show_secret():
 @limiter.limit("5/minute")  # 添加速率限制
 async def login_for_access_token(
     request: Request,
-    form_data: OAuth2PasswordRequestForm = Depends(),
+    form_data: LoginRequest = Body(...)  # 替换原有的OAuth2PasswordRequestForm
 ):
     user = await authenticate_user(form_data.username, form_data.password)
     if not user:
@@ -48,14 +55,16 @@ async def login_for_access_token(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    access_token_expires = timedelta(minutes=30)
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"username": user.user_name, "user_sn": user.user_sn},
         expires_delta=access_token_expires
     )
     return {
         "access_token": access_token,
-        "token_type": "bearer"
+        "token_type": "bearer",
+        "user_sn": user.user_sn,
+        "username": user.user_name
     }
 
 @app.get("/api/users/me/", response_model=User)
@@ -72,7 +81,7 @@ async def create_user(user_data: UserCreate):
         db.execute("""
             SELECT user_sn 
             FROM sys_users 
-            WHERE user_name = %(username)s
+            WHERE username = %(username)s
             """,
             {"username": username}
         )
@@ -86,7 +95,7 @@ async def create_user(user_data: UserCreate):
     # 创建用户
     with dblock() as db:
         db.execute("""
-            INSERT INTO sys_users (user_name)
+            INSERT INTO sys_users (username)
             VALUES (%(username)s)
             RETURNING user_sn
             """, {"username": username}

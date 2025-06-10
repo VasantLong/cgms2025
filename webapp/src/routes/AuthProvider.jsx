@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Outlet } from "react-router-dom";
+import { fetcher } from "../utils";
 
 const AuthProvider = () => {
   const [isValidating, setIsValidating] = useState(true);
@@ -15,8 +16,9 @@ const AuthProvider = () => {
       }
 
       try {
-        const response = await fetch("/api/users/me", {
+        const response = await fetcher("/api/users/me", {
           headers: { Authorization: `Bearer ${token}` },
+          credentials: "include", // 添加跨域凭证
         });
 
         if (!response.ok) {

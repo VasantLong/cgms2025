@@ -19,20 +19,17 @@ function Login() {
         body: JSON.stringify({ username, password }),
       });
 
-      if (response.access_token) {
-        localStorage.setItem("token", response.access_token);
-        // 存储用户基本信息
-        localStorage.setItem(
-          "user",
-          JSON.stringify({
-            username: response.user_info.user_sn,
-            realName: response.user_info.real_name,
-          })
-        );
-        navigate("/");
-      }
+      // 确保获取正确的字段
+      const { access_token, user_sn } = response;
+
+      // 存储用户信息
+      localStorage.setItem("token", access_token);
+      localStorage.setItem("userSn", user_sn); // 确保字段名一致
+
+      navigate("/dashboard");
     } catch (err) {
-      setError("登录失败，请检查用户名或密码");
+      const message = err.info?.detail || "网络连接异常";
+      setError(`登录失败：${message}`);
       console.error("Login error:", err);
     }
   };
