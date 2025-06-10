@@ -7,43 +7,15 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
-from sqlalchemy.orm import Session, sessionmaker, relationship
 
 from dotenv import load_dotenv
 import os
 import logging
 
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
+from .config import dblock
+from .error import ConflictError, InvalidError
 
 logger = logging.getLogger(__name__)
-
-Base = declarative_base()
-
-class SysUser(Base):
-    __tablename__ = 'sys_users'
-    
-    user_sn = Column(Integer, primary_key=True, index=True)
-    user_name = Column(String, unique=True, index=True)
-    
-    password = relationship("Password", back_populates="user", uselist=False)
-
-class Password(Base):
-    __tablename__ = 'passwords'
-    
-    id = Column(Integer, primary_key=True, index=True)
-    user_sn = Column(Integer, ForeignKey('sys_users.user_sn'))
-    hashed_password = Column(String)
-    
-    user = relationship("SysUser", back_populates="password")
-
-# 更新数据库连接字符串以匹配db.sql配置
-SQLALCHEMY_DATABASE_URL = "postgresql://examdb:md568cefad35fed037c318b1e44cc3480cf@localhost/examdb"
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# 创建表
-Base.metadata.create_all(bind=engine)
 
 
 
@@ -93,33 +65,41 @@ def verify_password(plain_password: str, hashed_password: str):
 def get_password_hash(password: str):
     return pwd_context.hash(password)
 
-def get_user(db: Session, username: str):
-    user = db.query(SysUser).filter(SysUser.user_name == username).first()
-    if user:
-        password = db.query(Password).filter(Password.user_sn == user.user_sn).first()
-        if password:
-            return user
-    return None
+async def get_user(username: str):
+    with dblock() as db:
+        db.execute("""
+            SELECT user_sn, user_name 
+            FROM sys_users 
+            WHERE user_name = %(username)s
+            """,
+            {"username": username}
+        )
+        user = db.fetchone()
+    return User(**user) if user else None
 
-def authenticate_user(db: Session, username: str, password: str):
-    user = get_user(db, username)
+async def authenticate_user(username: str, password: str):
+    user = await get_user(username)
     if not user:
-        # 添加登录失败日志
         logger.warning(f"登录尝试：用户 {username} 不存在")
         return False
     
-    db_password = db.query(Password).filter(Password.user_sn == user.user_sn).first()
+    # 查询密码
+    with dblock() as db:
+        db.execute("""
+            SELECT hashed_password 
+            FROM passwords 
+            WHERE user_sn = %(user_sn)s
+            """,
+            {"user_sn": user.user_sn}
+        )
+        db_password = db.fetchone()
     if not db_password:
         return False
     
     # 验证对比哈希值
-    if not verify_password(password, db_password.hashed_password): # type: ignore
+    if not db_password or not verify_password(password, db_password.hashed_password): 
         logger.warning(f"用户 {username} 密码错误")
         return False
-    
-    # 更新最后登录时间
-    user.last_login = datetime.now(timezone.utc)
-    db.commit()
 
     return user
 
@@ -131,8 +111,8 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
         expire = datetime.now(timezone.utc) + timedelta(minutes=15)
     to_encode.update({
         "exp": expire,
-        "user_sn": data.get("user_sn"),  # 添加用户序号
-        "real_name": data.get("real_name")  # 添加真实姓名
+        "sub": data.get("username"),
+        "user_sn": data.get("user_sn")
     })
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
@@ -152,10 +132,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     except JWTError:
         raise credentials_exception
     
-    db = SessionLocal()
-    user = get_user(db, username=token_data.username) # type: ignore
-    db.close()
-    
+    user = await get_user(username=token_data.username) # type: ignore
     if user is None:
         raise credentials_exception
     
@@ -163,14 +140,3 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 
 async def get_current_active_user(current_user: User = Depends(get_current_user)):
     return current_user
-
-# 数据库依赖
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-        # 确保会话完全关闭
-        db.expunge_all()
-        db.expire_on_commit = False
