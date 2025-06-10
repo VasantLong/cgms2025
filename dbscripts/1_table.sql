@@ -82,9 +82,33 @@ CREATE TABLE IF NOT EXISTS class_grade  (
         REFERENCES class(sn) ON DELETE CASCADE
 );
 
+-- === 教秘用户表（存储基础信息）
+DROP TABLE IF EXISTS sys_users;
+CREATE TABLE IF NOT EXISTS sys_users (
+    user_sn SERIAL PRIMARY KEY,          -- 自增序号
+    username VARCHAR(50) UNIQUE NOT NULL, -- 用户名（唯一）
+    real_name VARCHAR(50) NOT NULL,       -- 真实姓名（用于显示）
+    created_at TIMESTAMP DEFAULT NOW()    -- 创建时间
+);
+
+CREATE SEQUENCE seq_users_sn 
+    START 90000 INCREMENT 1 OWNED BY sys_users.user_sn;
+ALTER TABLE sys_users ALTER COLUMN user_sn
+    SET DEFAULT nextval('seq_users_sn');
+
+-- === 密码表（存储哈希值，与用户表关联）
+DROP TABLE IF EXISTS user_passwords;
+CREATE TABLE IF NOT EXISTS user_passwords (
+    id SERIAL PRIMARY KEY,
+    user_sn INTEGER UNIQUE NOT NULL REFERENCES sys_users(user_sn), -- 关联用户
+    hashed_password VARCHAR(100) NOT NULL                          -- 密码哈希值
+);
+
+
 -- 为常用查询添加索引
 CREATE INDEX idx_class_grade_student ON class_grade(stu_sn);
 CREATE INDEX idx_class_grade_class ON class_grade(class_sn);
+CREATE INDEX idx_user_passwords_user_sn ON user_passwords(user_sn);
 
 -- 优化多条件查询
 CREATE INDEX idx_grade_stu_class ON class_grade(stu_sn, class_sn);

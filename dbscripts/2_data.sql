@@ -2,6 +2,8 @@
 DELETE FROM course;
 DELETE FROM student;
 DELETE FROM class;
+DELETE FROM sys_users;
+DELETE FROM user_passwords;
 
 INSERT INTO student (no, name, gender, enrollment_date) VALUES
 ('230650101', '张三', 'M', '2023-09-01'), -- 23级065专业01班01号
@@ -42,3 +44,11 @@ INSERT INTO class_grade (stu_sn, class_sn, grade) VALUES
 (10003, 30002, 76.5),  -- 赵六
 (10005, 30002, 91.0),  -- 孙八
 (10006, 30002, 82.5);  -- 周九
+
+
+-- 添加默认教秘账户（密码已哈希）
+INSERT INTO sys_users (username, real_name) VALUES 
+('jiaomi_admin', '系统管理员');
+
+INSERT INTO user_passwords (user_sn, hashed_password) VALUES
+(90000, '$2b$12$5B9yzYpUXoQsYV7J3uDZEOX7QdFjic6Xg7pLx9VcQ4q9tZRk0QfYm'); -- 密码：Admin@1234
