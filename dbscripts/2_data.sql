@@ -51,4 +51,4 @@ INSERT INTO sys_users (username, real_name) VALUES
 ('jiaomi_admin', '系统管理员');
 
 INSERT INTO user_passwords (user_sn, hashed_password) VALUES
-(90000, '$2b$12$5B9yzYpUXoQsYV7J3uDZEOX7QdFjic6Xg7pLx9VcQ4q9tZRk0QfYm'); -- 密码：Admin@1234
+(90000, '$2a$12$v5D/e/Wwq69nnJ3mzLJrTeM/N1mEZ5fNT0mKMNTg8K3uvZWnT2N/G'); -- 密码：Admin@1234
