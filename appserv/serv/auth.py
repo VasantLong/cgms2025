@@ -11,9 +11,12 @@ from sqlalchemy.orm import Session, sessionmaker, relationship
 
 from dotenv import load_dotenv
 import os
+import logging
 
 from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
+
+logger = logging.getLogger(__name__)
 
 Base = declarative_base()
 
@@ -58,6 +61,15 @@ pwd_context = CryptContext(
     bcrypt__rounds=12  # 增加计算成本
 )
 
+# 密码策略常量
+PASSWORD_POLICY = {
+    'min_length': 8,
+    'require_upper': True,
+    'require_lower': True,
+    'require_digit': True,
+    'max_age_days': 90  # 密码有效期
+}
+
 # OAuth2 方案
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -92,6 +104,8 @@ def get_user(db: Session, username: str):
 def authenticate_user(db: Session, username: str, password: str):
     user = get_user(db, username)
     if not user:
+        # 添加登录失败日志
+        logger.warning(f"登录尝试：用户 {username} 不存在")
         return False
     
     db_password = db.query(Password).filter(Password.user_sn == user.user_sn).first()
@@ -100,8 +114,13 @@ def authenticate_user(db: Session, username: str, password: str):
     
     # 验证对比哈希值
     if not verify_password(password, db_password.hashed_password): # type: ignore
+        logger.warning(f"用户 {username} 密码错误")
         return False
     
+    # 更新最后登录时间
+    user.last_login = datetime.now(timezone.utc)
+    db.commit()
+
     return user
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -110,7 +129,11 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
         expire = datetime.now(timezone.utc) + expires_delta
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
+    to_encode.update({
+        "exp": expire,
+        "user_sn": data.get("user_sn"),  # 添加用户序号
+        "real_name": data.get("real_name")  # 添加真实姓名
+    })
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
