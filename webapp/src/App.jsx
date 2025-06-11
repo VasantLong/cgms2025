@@ -18,7 +18,33 @@ function App() {
         <Route path="/login/*" element={<PublicRoutes />} />
 
         {/* 需要认证的私有路由 */}
-        <Route path="/*" element={<PrivateRoutes />} />
+        <Route element={<AuthProvider />}>
+          <Route path="/" element={<PrivateRoutes />}>
+            <Route path="/student" element={<StudentHome />}>
+              <Route path="list" element={<StudentList />} />
+              <Route path="new" element={<StudentNew />} />
+              <Route path=":stuSn" element={<StudentEdit />} />
+            </Route>
+            <Route path="/course" element={<CourseHome />}>
+              <Route path="list" element={<CourseList />} />
+              <Route path="new" element={<CourseNew />} />
+              <Route path=":courseSn/edit" element={<CourseEdit />} />
+            </Route>
+            <Route path="/grade" element={<GradeHome />}>
+              <Route path="list" element={<GradeList />} />
+              <Route
+                path="student/:stuSn/course/:courseSn"
+                element={<GradeEdit />}
+              />
+            </Route>
+            <Route path="/class" element={<ClassHome />}>
+              <Route path="list" element={<ClassList />} />
+            </Route>
+            {/* 默认路由规则 */}
+            <Route path="/" element={<Navigate to="/grade/list" replace />} />
+            <Route path="*" element={<Navigate to="/grade/list" replace />} />
+          </Route>
+        </Route>
 
         {/* 默认重定向 */}
         <Route path="*" element={<Navigate to="/login" replace />} />

@@ -26,7 +26,7 @@ function Login() {
       localStorage.setItem("token", access_token);
       localStorage.setItem("userSn", user_sn); // 确保字段名一致
 
-      navigate("/dashboard");
+      navigate("/grade/list");
     } catch (err) {
       const message = err.info?.detail || "网络连接异常";
       setError(`登录失败：${message}`);
@@ -36,7 +36,9 @@ function Login() {
 
   return (
     <div className="login-container">
-      <h2>教秘系统登录</h2>
+      <div className="login-header">
+        <h2>教秘系统登录</h2>
+      </div>
       <form onSubmit={handleSubmit}>
         <div className="form-group">
           <label>用户名：</label>

@@ -6,12 +6,19 @@ import "./grade.css";
 function GradeTable(props) {
   const { data: items, error } = useSWR("/api/grade/list", fetcher, {
     onSuccess: (data) => {
-      console.log("API Response Data:", data);
+      console.log("[DEBUG] Grade data:", data); // 添加数据日志
     },
+    onError: (err) => {
+      console.error("[ERROR] Grade fetch error:", err); // 添加错误日志
+    },
+
+    shouldRetryOnError: false, // 添加请求重试配置
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false, // 添加防缓存配置
   });
 
   if (error) {
-    return <div>数据加载失败</div>;
+    return <div>数据加载失败：{error.message}</div>;
   }
 
   if (!items) {
@@ -21,6 +28,9 @@ function GradeTable(props) {
   const testItems = [
     { grade_sn: 1, stu_name: "张三", course_name: "高等数学", grade: 85.5 },
   ];
+
+  console.log("Grade数据:", items);
+  console.log("当前用户token:", localStorage.getItem("token"));
 
   return (
     <table className="table">
