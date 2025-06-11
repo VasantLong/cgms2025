@@ -1,9 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetcher } from "../utils";
 import "./login.css";
 
 function Login() {
+  // 在组件挂载时添加类名，卸载时移除
+  useEffect(() => {
+    const root = document.getElementById("root");
+    root.classList.add("login-root");
+    return () => {
+      root.classList.remove("login-root");
+    };
+  }, []);
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -37,10 +46,10 @@ function Login() {
   return (
     <div className="login-container">
       <div className="login-header">
-        <h2>教秘系统登录</h2>
+        <h2>成绩管理系统登录</h2>
       </div>
       <form onSubmit={handleSubmit}>
-        <div className="form-group">
+        <div className="field">
           <label>用户名：</label>
           <input
             type="text"
@@ -49,7 +58,7 @@ function Login() {
             required
           />
         </div>
-        <div className="form-group">
+        <div className="field">
           <label>密码：</label>
           <input
             type="password"
