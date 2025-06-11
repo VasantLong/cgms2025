@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { StudentHome, StudentList, StudentEdit, StudentNew } from "./student";
 import { CourseHome, CourseList, CourseEdit, CourseNew } from "./course";
 import { GradeHome, GradeList, GradeEdit } from "./grade";
-import { ClassHome, ClassList } from "./class";
+import { ClassHome, ClassList, ClassEdit, ClassNew } from "./class";
 import { Login } from "./login";
 import { PublicRoutes, PrivateRoutes, AuthProvider } from "./routes";
 import NaviMenu from "./NaviMenu";
@@ -39,6 +39,8 @@ function App() {
             </Route>
             <Route path="/class" element={<ClassHome />}>
               <Route path="list" element={<ClassList />} />
+              <Route path="new" element={<ClassNew />} />
+              <Route path=":classSn" element={<ClassEdit />} />
             </Route>
             {/* 默认路由规则 */}
             <Route path="/" element={<Navigate to="/grade/list" replace />} />

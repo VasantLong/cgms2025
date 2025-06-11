@@ -108,6 +108,8 @@ CREATE TABLE IF NOT EXISTS user_passwords (
 -- 为常用查询添加索引
 CREATE INDEX idx_class_grade_student ON class_grade(stu_sn);
 CREATE INDEX idx_class_grade_class ON class_grade(class_sn);
+CREATE INDEX idx_class_course ON class(cou_sn);
+CREATE INDEX idx_class_semester ON class(semester);
 CREATE INDEX idx_user_passwords_user_sn ON user_passwords(user_sn);
 CREATE INDEX idx_sys_users_name ON sys_users USING BTREE (user_name);
 

@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
-function CourseDetail(props) {
-  const { courseinfo } = props;
+function CourseDetail({ courseinfo }) {
   const formRef = useRef(null);
   let navigate = useNavigate();
   console.log(`courseinfo: ${JSON.stringify(courseinfo)}`);

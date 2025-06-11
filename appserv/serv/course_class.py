@@ -1,13 +1,13 @@
 import asyncio
 from dataclasses import asdict
-from fastapi import status
+from fastapi import status, Depends
 import datetime as dt
 from fastapi import HTTPException
 
 from pydantic import BaseModel, field_validator
 from .config import app, dblock
 from .error import ConflictError, InvalidError
-
+from .auth import get_current_user, get_current_active_user, User
 
 class Class(BaseModel):
     class_sn: int | None
@@ -27,6 +27,13 @@ class Class(BaseModel):
             raise ValueError("班次号格式应为5位数字课程号-4位数字年份")
         return v
 
+# 教秘角色校验函数（感觉没什么大用）
+def validate_jiaomi_role(username: str):
+    if not username.startswith("jiaomi_"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="仅教秘用户可执行此操作"
+        )
 
 @app.get("/api/class/list")
 async def get_class_list() -> list[Class]:
@@ -61,7 +68,12 @@ async def get_class_profile(class_sn: int) -> Class:
 
 # 确认课程号包含在班次号中
 @app.post("/api/class", status_code=status.HTTP_201_CREATED)
-async def create_class(class_data: Class) -> Class:
+async def create_class(
+    class_data: Class, 
+    current_user: User = Depends(get_current_active_user)
+) -> Class:
+
+    validate_jiaomi_role(current_user.user_name)  # 新增角色校验
     class_no = class_data.class_no
     with dblock() as db:
         # 检查班次号是否已存在
@@ -101,9 +113,18 @@ async def create_class(class_data: Class) -> Class:
 
 
 @app.put("/api/class/{class_sn}")
-async def update_class(class_sn: int, class_data: Class) -> Class:
-    assert class_sn == class_data.class_sn
+async def update_class(
+    class_sn: int, 
+    class_data: Class,
+    current_user: User = Depends(get_current_active_user)
+) -> Class:
+    
+    validate_jiaomi_role(current_user.user_name)  # 新增角色校验
+    # 参数校验
+    if class_sn != class_data.class_sn:
+        raise HTTPException(400, "班次SN不匹配")
     class_no = class_data.class_no
+
     with dblock() as db:
         # 检查班次号是否已存在（排除自身）
         db.execute(
@@ -126,16 +147,33 @@ async def update_class(class_sn: int, class_data: Class) -> Class:
         )
         if not db.fetchone():
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "班次号中的课程号与关联课程不匹配")
-        # 更新数据
-        db.execute("UPDATE class SET class_no=%(class_no)s, name=%(name)s, semester=%(semester)s, location=%(location)s, cou_sn=%(course_sn)s WHERE sn=%(class_sn)s",
-                 class_data.model_dump())
+        
+        # 更新数据库
+        db.execute("""
+            UPDATE class SET 
+            class_no=%(class_no)s, 
+            name=%(name)s,
+            semester=%(semester)s,
+            location=%(location)s,
+            cou_sn=%(course_sn)s 
+            WHERE sn=%(class_sn)s
+            """,
+            class_data.model_dump()
+        )
     return class_data
 
 @app.delete("/api/class/{class_sn}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_class(class_sn: int):
+async def delete_class(
+    class_sn: int,
+    current_user: User = Depends(get_current_active_user)
+):
+    validate_jiaomi_role(current_user.user_name)  # 新增角色校验
     with dblock() as db:
-        db.execute("DELETE FROM class WHERE sn=%(class_sn)s", {"class_sn": class_sn})
+        db.execute(
+            "DELETE FROM class WHERE sn=%(class_sn)s",
+            {"class_sn": class_sn}
+        )
         if db.rowcount == 0:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, f"无此班次(sn={class_sn})")
+            raise HTTPException(404, "班次不存在")
 
 # 其他辅助函数...
