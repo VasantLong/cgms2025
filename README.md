@@ -65,30 +65,12 @@
 
 ### 团队分工方案（4 人）
 
-1. **成员 A**
-   - 前端：React 组件开发(webapp/src/course/)
-   - 后端：Flask API 开发(appserv/serv/course.py)
-   - 负责：课程基础信息模块
-2. **成员 B**
-   - 前端：React 组件开发(webapp/src/grade/)
-   - 后端：Flask API 开发(appserv/serv/grade.py)
-   - 负责：课程分班次功能前后端开发
-   - 重点：确保教秘用户角色需求得到满足
-3. **成员 C**
-   - 前端：React 组件开发(webapp/src/grade/)
-   - 后端：Flask API 开发(appserv/serv/grade.py)
-   - 负责：成绩录入前端和查询后端
-4. **成员 D**
-   - 前端：React 组件开发(webapp/src/student/)
-   - 后端：Flask API 开发(appserv/serv/student.py)
-   - 负责：报表生成前后端
-
 ## 项目完成情况
 
-- 任务 3：
+- 任务 3 v3.4.0：
   数据库表 course 包含课程号、课程名、学分、学时字段；后端 appserv/serv/course.py 实现了课程信息的 CRUD 接口；前端 webapp/src/course/CourseDetail.jsx 包含课程号、课程名、学分、学时的表单组件。任务 3 的要求已全部达标。
 
-- 任务 1：设置教秘用户角色及登录权限。
+- 任务 1：设置教秘用户角色及登录权限。v4.0.0
 
   - 用户名: jiaomi_admin
 
@@ -126,3 +108,11 @@
    3. ….
 
 ## 项目开发过程分支
+
+1. v3.4.0
+   - feature/course-basic-info
+   - feat/sql-info-debug
+   - feat/stu_cou-info-debug
+   - feat/gradeinfo-debug
+2. v4.0.0
+   - feat/login-auth
