@@ -1,9 +1,11 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import { StudentHome, StudentList, StudentEdit, StudentNew } from "./student";
 import { CourseHome, CourseList, CourseEdit, CourseNew } from "./course";
 import { GradeHome, GradeList, GradeEdit } from "./grade";
 import { ClassHome, ClassList } from "./class";
+import { Login } from "./login";
+import { PublicRoutes, PrivateRoutes, AuthProvider } from "./routes";
 import NaviMenu from "./NaviMenu";
 import "./components.css";
 import "./App.css";
@@ -11,18 +13,13 @@ import "./App.css";
 function App() {
   return (
     <BrowserRouter>
-      {/* 必须根包含BrowserRouter组件，定义其控制范围 */}
-      <div className="page-header">
-        <img className="logo" src="/tgu_logo_256.png" alt="tgu logo" />
-        <div className="title">成绩管理系统</div>
-      </div>
+      <Routes>
+        {/* 公共路由 */}
+        <Route path="/login/*" element={<PublicRoutes />} />
 
-      <NaviMenu className="page-sidebar" />
-
-      <div className="page-body">
-        <div className="page-content">
-          {/* 根据URL导航路径匹配相应业务功能组件 */}
-          <Routes>
+        {/* 需要认证的私有路由 */}
+        <Route element={<AuthProvider />}>
+          <Route path="/" element={<PrivateRoutes />}>
             <Route path="/student" element={<StudentHome />}>
               <Route path="list" element={<StudentList />} />
               <Route path="new" element={<StudentNew />} />
@@ -43,13 +40,15 @@ function App() {
             <Route path="/class" element={<ClassHome />}>
               <Route path="list" element={<ClassList />} />
             </Route>
-            <Route path="*" element={<GradeList />} />
-          </Routes>
-        </div>
-        <div className="page-footer">
-          &copy; 天津工业大学经济与管理学院 2025
-        </div>
-      </div>
+            {/* 默认路由规则 */}
+            <Route path="/" element={<Navigate to="/grade/list" replace />} />
+            <Route path="*" element={<Navigate to="/grade/list" replace />} />
+          </Route>
+        </Route>
+
+        {/* 默认重定向 */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
     </BrowserRouter>
   );
 }

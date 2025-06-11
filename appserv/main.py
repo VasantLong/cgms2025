@@ -4,3 +4,5 @@ import serv.student
 import serv.grade  # noqa: F401
 import serv.course # noqa: F401
 import serv.course_class
+import serv.auth # noqa: F401
+import serv.login # noqa: F401

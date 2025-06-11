@@ -86,17 +86,35 @@
 ## 项目完成情况
 
 - 任务 3：
-  需要检查任务 3 的三个关键部分：前端是否有完整的课程基础信息管理界面（如包含课程号、课程名、学分、学时的表单组件），后端是否实现课程信息的 CRUD 接口（如 course.py 中的增删改查 API），以及数据库表 course 是否包含所有基础字段（查看 dbscripts/1_table.sql）。需逐一验证这三部分是否均已完成，以确认任务 3 是否达标。
+  数据库表 course 包含课程号、课程名、学分、学时字段；后端 appserv/serv/course.py 实现了课程信息的 CRUD 接口；前端 webapp/src/course/CourseDetail.jsx 包含课程号、课程名、学分、学时的表单组件。任务 3 的要求已全部达标。
 
-  webapp\src\course\CourseList.jsx
-  appserv\serv\course.py
-  需要查看课程新建页面的前端组件，确认是否包含课程号、课程名、学分、学时的表单输入字段，以验证任务 3 的前端部分是否完成。
+- 任务 1：设置教秘用户角色及登录权限。
 
-  webapp\src\course\CourseNew.jsx
-  需要查看课程详细信息页面的前端组件 CourseDetail.jsx，确认是否包含课程号、课程名、学分、学时的表单输入字段，以验证任务 3 的前端部分是否完成。
+  - 用户名: jiaomi_admin
 
-  webapp\src\course\CourseDetail.jsx
-  已检查任务 3 的三个关键部分：数据库表 course 包含课程号、课程名、学分、学时字段；后端 appserv/serv/course.py 实现了课程信息的 CRUD 接口；前端 webapp/src/course/CourseDetail.jsx 包含课程号、课程名、学分、学时的表单组件。任务 3 的要求已全部达标。
+  - 密码: Admin@1234
+
+  - 因开发需要，将.env.example 文件重命名为.env，然后修改.env 文件中的 DATABASE_URL 为自己的数据库连接地址。
+    ├── appserv/
+    │ ├── .env # 实际使用的环境变量
+    │ ├── .env.example # 示例模板
+    │ └── serv/
+
+    - 配置方式：
+
+      1. 进入后端目录 `cd appserv`
+
+      2. 一键生成密钥并创建 .env（Windows PowerShell）
+
+         ```powershell
+         openssl rand -hex 32 | Out-File -Encoding utf8 .env
+
+         Get-Content .env.example | Add-Content .env
+         ```
+
+      3. 进入.env 中修改
+
+         把 your_32byte_random_string_here 替换成第一行的一串码，删除第一行的码
 
 1. 张三
    1. ….
