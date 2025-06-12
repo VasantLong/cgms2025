@@ -20,19 +20,25 @@ function ClassDetail({ classinfo }) {
     if (!selectedCouSn) return;
 
     let course = courses.find(
-      //表单传入的元素属性使用前端的名称，elements同理，是传入后端的classinfo？？？
+      //表单传入的元素属性使用前端的名称，而fieldName使用后端classinfo的名称
       (c) => c.course_sn == selectedCouSn
     );
-    if (course) {
-      // 自动生成班次号：课程号-当前年份
-      // 使用课程对象的 course_no（来自课程列表接口）
-      formRef.current.elements.class_no.value = `${course.course_no}-${year}`;
-
-      // 自动生成学期：年份区间+学期类型
-      // 使用本地状态 year 和 semesterType
-      formRef.current.elements.semester.value = `${year}-${
-        Number(year) + 1
-      }-${semesterType}`;
+    if (course && year && semesterType) {
+      fetch(
+        `/api/class/sequence?cou_sn=${selectedCouSn}&year=${year}&semesterType=${semesterType}`
+      )
+        .then((res) => res.json())
+        .then((data) => {
+          const nextSeq = (data.max_sequence || 0) + 1;
+          // 自动生成班次号：课程号-当前年份-学期类型-序号（使用课程对象的 course_no）
+          formRef.current.elements.class_no.value = `${
+            course.course_no
+          }-${year}S${semesterType}-${nextSeq.toString().padStart(2, "0")}`;
+          // 自动生成学期：年份区间+学期类型（使用本地状态 year 和 semesterType）
+          formRef.current.elements.semester.value = `${year}-${
+            Number(year) + 1
+          }-${semesterType}`;
+        });
     }
   }, [courses, year, semesterType, selectedCouSn]);
 

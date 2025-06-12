@@ -47,8 +47,8 @@ ALTER TABLE course ALTER sn
 DROP TABLE IF EXISTS class;
 CREATE TABLE IF NOT EXISTS class  (
     sn       INTEGER,          -- 自增序号（从30000开始）
-    class_no VARCHAR(15)       -- 班次号（格式：10055-2023）
-        CHECK (class_no ~ '^\d{5}-\d{4}$'), -- 课程号-年份
+    class_no VARCHAR(15)       -- 班次号（格式：10055-2023S1-01）
+        CHECK (class_no ~ '^\d{5}-\d{4}S[12]-\d{2}$'), -- 新校验规则
     name     TEXT,             -- 可选的班次描述
     semester VARCHAR(11)       -- 学期（格式：2024-2025-1）
         CHECK (semester ~ '^\d{4}-\d{4}-[12]$'),
@@ -63,6 +63,16 @@ CREATE SEQUENCE seq_class_sn
     START 30000 INCREMENT 1 OWNED BY class.sn;
 ALTER TABLE class ALTER COLUMN sn 
     SET DEFAULT nextval('seq_class_sn');
+
+-- 修改班次号校验规则
+ALTER TABLE class 
+    DROP CONSTRAINT class_class_no_check,
+    ADD CONSTRAINT class_class_no_check 
+        CHECK (class_no ~ '^\d{5}-\d{4}S[12]-\d{2}$');
+
+-- 添加班次序号字段（可选，或通过班次号解析）
+ALTER TABLE class ADD COLUMN class_seq SMALLINT;
+
 
 -- === 成绩表
 DROP TABLE IF EXISTS class_grade;

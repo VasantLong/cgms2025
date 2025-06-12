@@ -3,6 +3,7 @@ from dataclasses import asdict
 from fastapi import status, Depends
 import datetime as dt
 from fastapi import HTTPException
+import re
 
 from pydantic import BaseModel, field_validator
 from .config import app, dblock
@@ -19,12 +20,10 @@ class Class(BaseModel):
 
     @field_validator('class_no')
     def validate_class_no(cls, v):
-        try:
-            course_no, year = v.split('-')
-        except ValueError:
-            raise ValueError("班次号格式应为'课程号-年份'（如10055-2023）")
-        if not course_no.isdigit() or len(course_no)!=5 or not year.isdigit() or len(year)!=4:
-            raise ValueError("班次号格式应为5位数字课程号-4位数字年份")
+        # 还需要检查课程号是否存在，学期格式是否正确，序号是否合法等
+        pattern = r'^\d{5}-\d{4}S[12]-\d{2}$'
+        if not re.match(pattern, v):
+            raise ValueError("班次号格式应为'课程号-年份学期-序号'（如10055-2023S1-01）")
         return v
 
 # 教秘角色校验函数（感觉没什么大用）
@@ -46,6 +45,29 @@ async def get_class_list() -> list[Class]:
         data = [Class(**asdict(row)) for row in db]
 
     return data
+
+# 新增获取班次序号的API端点
+@app.get("/api/class/sequence")
+async def get_class_sequence(cou_sn: int, year: int, semester_type: str):
+    #
+    with dblock() as db:
+        db.execute("""
+            SELECT MAX(CAST(SPLIT_PART(class_no, '-', 3) AS INTEGER))
+            FROM class 
+            WHERE cou_sn = %(cou_sn)s 
+              AND class_no LIKE %(pattern)s
+            """, 
+            {
+            "cou_sn": cou_sn,
+            "pattern": f"%-{year}S{semester_type}-%"
+        })
+        row = db.fetchone()
+        if row is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="未找到相关班次"
+            )
+        return {"max_sequence": row[0] or 0}
 
 @app.get("/api/class/{class_sn}")
 async def get_class_profile(class_sn) -> Class:
