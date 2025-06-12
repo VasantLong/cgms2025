@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
-function StudentDetail(props) {
-  const { stuinfo } = props;
+function StudentDetail({ stuinfo }) {
   const formRef = useRef(null);
   let navigate = useNavigate();
 

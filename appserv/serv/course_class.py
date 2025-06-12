@@ -15,7 +15,7 @@ class Class(BaseModel):
     name: str | None
     semester: str | None
     location: str | None
-    course_sn: int
+    cou_sn: int
 
     @field_validator('class_no')
     def validate_class_no(cls, v):
@@ -39,7 +39,7 @@ def validate_jiaomi_role(username: str):
 async def get_class_list() -> list[Class]:
     with dblock() as db:
         db.execute("""
-        SELECT sn AS class_sn, class_no, name, semester, location, cou_sn AS course_sn
+        SELECT sn AS class_sn, class_no, name, semester, location, cou_sn
         FROM class 
         ORDER BY class_no, name
         """)
@@ -48,11 +48,11 @@ async def get_class_list() -> list[Class]:
     return data
 
 @app.get("/api/class/{class_sn}")
-async def get_class_profile(class_sn: int) -> Class:
+async def get_class_profile(class_sn) -> Class:
     with dblock() as db:
         db.execute(
             """
-            SELECT sn AS class_sn, class_no, name, semester, location, cou_sn AS course_sn
+            SELECT sn AS class_sn, class_no, name, semester, location, cou_sn
             FROM class WHERE sn=%(class_sn)s
             """,
             dict(class_sn=class_sn),
@@ -91,10 +91,10 @@ async def create_class(
         # 验证课程号匹配
         course_no_part = class_no.split('-')[0]
         db.execute(
-            """SELECT 1 FROM course 
-            WHERE sn=%(course_sn)s AND no=%(course_no)s
+            """SELECT sn AS course_sn, no AS course_no FROM course 
+            WHERE sn=%(cou_sn)s AND no=%(course_no)s
             """,
-            {"course_sn": class_data.course_sn, "course_no": course_no_part}
+            {"cou_sn": class_data.cou_sn, "course_no": course_no_part}
         )
         if not db.fetchone():
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "班次号中的课程号与关联课程不匹配")
@@ -102,13 +102,13 @@ async def create_class(
         db.execute(
             """
             INSERT INTO class (class_no, name, semester, location, cou_sn) 
-            VALUES (%(class_no)s, %(name)s, %(semester)s, %(location)s, %(course_sn)s) 
-            RETURNING sn
+            VALUES (%(class_no)s, %(name)s, %(semester)s, %(location)s, %(cou_sn)s) 
+            RETURNING sn AS class_sn
             """,
             class_data.model_dump()
         )
         row = db.fetchone()
-        class_data.class_sn = row.sn  # type: ignore
+        class_data.class_sn = row.class_sn  # type: ignore
     return class_data
 
 
@@ -143,7 +143,7 @@ async def update_class(
             SELECT 1 FROM course 
             WHERE sn=%(cou_sn)s AND no=%(course_no)s
             """,
-            {"cou_sn": class_data.course_sn, "course_no": course_no_part}
+            {"cou_sn": class_data.cou_sn, "course_no": course_no_part}
         )
         if not db.fetchone():
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "班次号中的课程号与关联课程不匹配")
@@ -155,7 +155,7 @@ async def update_class(
             name=%(name)s,
             semester=%(semester)s,
             location=%(location)s,
-            cou_sn=%(course_sn)s 
+            cou_sn=%(cou_sn)s 
             WHERE sn=%(class_sn)s
             """,
             class_data.model_dump()

@@ -3,7 +3,7 @@ import useSWR from "swr";
 import ClassDetail from "./ClassDetail";
 import { fetcher } from "../utils";
 
-function ClassEdit() {
+function ClassEdit(props) {
   const { classSn } = useParams();
   console.log(`classSn: ${classSn}`);
   const { data: classinfo, error } = useSWR(`/api/class/${classSn}`, fetcher);
@@ -29,7 +29,7 @@ function ClassEdit() {
       <div className="paper-head">
         <h3>{`课程信息：${classinfo.name} (#${classinfo.class_sn})`}</h3>
       </div>
-      <ClassDetail classinfo={data} />
+      <ClassDetail classinfo={classinfo} />
     </div>
   );
 }

@@ -10,7 +10,7 @@ function ClassNew(props) {
       <div className="paper-head">
         <h3>新建班次</h3>
       </div>
-      <ClassDetail classinfo={{}} />
+      <ClassDetail classinfo={classinfo} />
     </div>
   );
 }

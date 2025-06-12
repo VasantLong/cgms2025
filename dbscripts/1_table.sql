@@ -63,7 +63,6 @@ CREATE SEQUENCE seq_class_sn
     START 30000 INCREMENT 1 OWNED BY class.sn;
 ALTER TABLE class ALTER COLUMN sn 
     SET DEFAULT nextval('seq_class_sn');
-CREATE INDEX idx_class_cou_sn ON class(cou_sn);
 
 -- === 成绩表
 DROP TABLE IF EXISTS class_grade;
@@ -108,10 +107,9 @@ CREATE TABLE IF NOT EXISTS user_passwords (
 -- 为常用查询添加索引
 CREATE INDEX idx_class_grade_student ON class_grade(stu_sn);
 CREATE INDEX idx_class_grade_class ON class_grade(class_sn);
-CREATE INDEX idx_class_course ON class(cou_sn);
 CREATE INDEX idx_class_semester ON class(semester);
 CREATE INDEX idx_user_passwords_user_sn ON user_passwords(user_sn);
-CREATE INDEX idx_sys_users_name ON sys_users USING BTREE (user_name);
+CREATE INDEX idx_sys_users_name ON sys_users USING BTREE (username);
 
 -- 优化多条件查询
 CREATE INDEX idx_grade_stu_class ON class_grade(stu_sn, class_sn);

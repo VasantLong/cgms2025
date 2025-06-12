@@ -11,7 +11,7 @@ function NavMenu({ className }) {
           <NavLink to="/course/list">课程</NavLink>
         </li>
         <li>
-          <NavLink to="/class/list">班级</NavLink>
+          <NavLink to="/class/list">班次</NavLink>
         </li>
         <li>
           <NavLink to="/grade/list">成绩</NavLink>
