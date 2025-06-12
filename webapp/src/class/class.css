@@ -44,3 +44,17 @@ form .field .radio-choices input[type="radio"] {
   justify-content: space-around;
   width: 20em;
 }
+
+.generated-value {
+  padding: 6px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #f5f5f5;
+  color: #666;
+}
+
+.auto-generated {
+  background-color: #f8f9fa;
+  cursor: not-allowed;
+  color: #6c757d;
+}

@@ -1,6 +1,6 @@
 import asyncio
 from dataclasses import asdict
-from fastapi import status, Depends
+from fastapi import status, Depends, Query
 import datetime as dt
 from fastapi import HTTPException
 import re
@@ -46,13 +46,18 @@ async def get_class_list() -> list[Class]:
 
     return data
 
-# 新增获取班次序号的API端点
+# 获取指定课程在特定学年学期下的最新班次序号
 @app.get("/api/class/sequence")
-async def get_class_sequence(cou_sn: int, year: int, semester_type: str):
-    #
+async def get_class_sequence(
+    cou_sn: int, 
+    year: int, 
+    semester_type: str = Query(..., alias="semesterType")
+):  # 使用别名
+    
+    # 匹配某课程特定学期（比如2023S1）的班次，返回最大的序号
     with dblock() as db:
         db.execute("""
-            SELECT MAX(CAST(SPLIT_PART(class_no, '-', 3) AS INTEGER))
+            SELECT MAX(CAST(SPLIT_PART(class_no, '-', 3) AS INTEGER)) AS max_seq
             FROM class 
             WHERE cou_sn = %(cou_sn)s 
               AND class_no LIKE %(pattern)s
@@ -67,7 +72,8 @@ async def get_class_sequence(cou_sn: int, year: int, semester_type: str):
                 status_code=status.HTTP_404_NOT_FOUND, 
                 detail="未找到相关班次"
             )
-        return {"max_sequence": row[0] or 0}
+        max_sequence = row.max_seq if (row and row.max_seq is not None) else 0
+        return {"max_sequence": max_sequence}
 
 @app.get("/api/class/{class_sn}")
 async def get_class_profile(class_sn) -> Class:

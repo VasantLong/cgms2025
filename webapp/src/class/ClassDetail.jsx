@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import "./class.css";
 
 function ClassDetail({ classinfo }) {
   const formRef = useRef();
@@ -11,7 +12,7 @@ function ClassDetail({ classinfo }) {
   const [courses, setCourses] = useState([]);
   const [selectedCouSn, setSelectedCouSn] = useState(null);
   const [year, setYear] = useState(new Date().getFullYear());
-  const [semesterType, setSemesterType] = useState("1");
+  const [semesterType, setSemesterType] = useState("");
 
   // 生成班次号和学期
   useEffect(() => {
@@ -29,15 +30,27 @@ function ClassDetail({ classinfo }) {
       )
         .then((res) => res.json())
         .then((data) => {
-          const nextSeq = (data.max_sequence || 0) + 1;
           // 自动生成班次号：课程号-当前年份-学期类型-序号（使用课程对象的 course_no）
-          formRef.current.elements.class_no.value = `${
-            course.course_no
-          }-${year}S${semesterType}-${nextSeq.toString().padStart(2, "0")}`;
+          let nextSeq = (data.max_sequence || 0) + 1;
+          let classNo = `${course.course_no}-${year}S${semesterType}-${nextSeq
+            .toString()
+            .padStart(2, "0")}`;
+          formRef.current.elements.class_no.value = classNo;
           // 自动生成学期：年份区间+学期类型（使用本地状态 year 和 semesterType）
           formRef.current.elements.semester.value = `${year}-${
             Number(year) + 1
           }-${semesterType}`;
+
+          // 当名称为空或匹配自动生成模式时，自动生成班次名称：课程名 + 序号
+          let className = `${course.course_name}_${nextSeq
+            .toString()
+            .padStart(2, "0")}`;
+          if (
+            !formRef.current.elements.name.value ||
+            formRef.current.elements.name.value.startsWith(course.course_name)
+          ) {
+            formRef.current.elements.name.value = className;
+          }
         });
     }
   }, [courses, year, semesterType, selectedCouSn]);
@@ -100,6 +113,10 @@ function ClassDetail({ classinfo }) {
     if (!formRef.current) return;
     if (!formRef.current?.elements.cou_sn.value) {
       setActionError("请选择关联课程");
+      return;
+    }
+    if (year === "" || semesterType === "0") {
+      setActionError("请先选择学年和学期类型");
       return;
     }
 
@@ -174,31 +191,6 @@ function ClassDetail({ classinfo }) {
       <div className="paper-body">
         <form ref={formRef} onChange={() => setDirty(true)}>
           <div className="field">
-            <label>班次名称：</label>
-            <input name="name" />
-          </div>
-
-          <div className="field">
-            <label>班次号：</label>
-            <input type="text" name="class_no" readOnly pattern="\d{5}-\d{4}" />
-          </div>
-
-          <div className="field">
-            <label>学期：</label>
-            <input
-              type="text"
-              name="semester"
-              readOnly
-              pattern="^\d{4}-\d{4}-[12]$"
-            />
-          </div>
-
-          <div className="field">
-            <label>地点：</label>
-            <input type="text" name="location" onChange={checkChange} />
-          </div>
-
-          <div className="field">
             <label>关联课程：</label>
             <select
               name="cou_sn"
@@ -218,8 +210,13 @@ function ClassDetail({ classinfo }) {
           </div>
 
           <div className="field">
-            <label>学年：</label>
-            <select value={year} onChange={(e) => setYear(e.target.value)}>
+            <label>起始学年：</label>
+            <select
+              value={year}
+              onChange={(e) => setYear(e.target.value)}
+              required
+            >
+              <option value="">请选择学年</option>
               {Array.from(
                 { length: 5 },
                 (_, i) => new Date().getFullYear() - 2 + i
@@ -236,10 +233,69 @@ function ClassDetail({ classinfo }) {
             <select
               value={semesterType}
               onChange={(e) => setSemesterType(e.target.value)}
+              required
             >
+              <option value="">请选择学期</option>
               <option value="1">秋季学期</option>
               <option value="2">春季学期</option>
             </select>
+          </div>
+
+          <div className="field">
+            <label>班次名称：</label>
+            <div style={{ position: "relative" }}>
+              <input
+                name="name"
+                onFocus={(e) => {
+                  if (
+                    e.target.value ===
+                    `${
+                      courses.find((c) => c.course_sn == selectedCouSn)
+                        ?.course_name || ""
+                    }01`
+                  ) {
+                    e.target.value = "";
+                  }
+                }}
+              />
+              {/* 提示文字 */}
+              <div
+                style={{
+                  position: "absolute",
+                  right: "8px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "#999",
+                  pointerEvents: "none",
+                  display: formRef.current?.elements.name.value
+                    ? "none"
+                    : "block",
+                }}
+              >
+                {selectedCouSn ? "" : "选择课程后将自动生成"}
+              </div>
+            </div>
+          </div>
+
+          <div className="field">
+            <label>班次号：</label>
+            <div className="generated-value">
+              <span>{formRef.current?.elements.class_no.value}</span>
+              <input type="hidden" name="class_no" />
+            </div>
+          </div>
+
+          <div className="field">
+            <label>学期：</label>
+            <div className="generated-value">
+              <span>{formRef.current?.elements.semester.value}</span>
+              <input type="hidden" name="semester" />
+            </div>
+          </div>
+
+          <div className="field">
+            <label>地点：</label>
+            <input type="text" name="location" onChange={checkChange} />
           </div>
         </form>
       </div>
