@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import useSWR from "swr";
 import ClassDetail from "./ClassDetail";
 import { fetcher } from "../utils";
@@ -6,6 +6,7 @@ import { fetcher } from "../utils";
 function ClassEdit(props) {
   const { classSn } = useParams();
   console.log(`classSn: ${classSn}`);
+  const location = useLocation();
   const { data: classinfo, error } = useSWR(`/api/class/${classSn}`, fetcher);
 
   if (error) {
@@ -24,12 +25,18 @@ function ClassEdit(props) {
     );
   }
 
+  // 合并导航传递的状态和从API获取的数据
+  const mergedClassInfo = location.state?.preservedValues
+    ? { ...classinfo, ...location.state.preservedValues }
+    : classinfo;
+  console.log("Merged Class Info:", mergedClassInfo);
+
   return (
     <div className="paper">
       <div className="paper-head">
-        <h3>{`课程信息：${classinfo.name} (#${classinfo.class_sn})`}</h3>
+        <h3>{`班次信息：${classinfo.name} (#${classinfo.class_sn})`}</h3>
       </div>
-      <ClassDetail classinfo={classinfo} />
+      <ClassDetail classinfo={mergedClassInfo} />
     </div>
   );
 }

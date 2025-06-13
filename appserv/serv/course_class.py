@@ -51,27 +51,31 @@ async def get_class_list() -> list[Class]:
 async def get_class_sequence(
     cou_sn: int, 
     year: int, 
-    semester_type: str = Query(..., alias="semesterType")
-):  # 使用别名
+    semester_type: str = Query(..., alias="semesterType"),
+    exclude_class_sn: int | None = Query(None)
+):  # 使用别名# 新增参数，用于排除当前班次
     
     # 匹配某课程特定学期（比如2023S1）的班次，返回最大的序号
     with dblock() as db:
-        db.execute("""
+        query = """
             SELECT MAX(CAST(SPLIT_PART(class_no, '-', 3) AS INTEGER)) AS max_seq
             FROM class 
             WHERE cou_sn = %(cou_sn)s 
               AND class_no LIKE %(pattern)s
-            """, 
-            {
+        """
+        params = {
             "cou_sn": cou_sn,
             "pattern": f"%-{year}S{semester_type}-%"
-        })
+        }
+
+        # 如果传入了排除的class_sn，则添加到查询条件
+        if exclude_class_sn:
+            query += " AND sn != %(exclude_sn)s"
+            params["exclude_sn"] = exclude_class_sn
+            
+        db.execute(query, params)
         row = db.fetchone()
-        if row is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, 
-                detail="未找到相关班次"
-            )
+
         max_sequence = row.max_seq if (row and row.max_seq is not None) else 0
         return {"max_sequence": max_sequence}
 

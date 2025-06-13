@@ -6,59 +6,93 @@ function ClassDetail({ classinfo }) {
   const formRef = useRef();
   let navigate = useNavigate();
 
+  const isNew = classinfo.class_sn === null; //区分新增和编辑
   const [isDirty, setDirty] = useState(false);
   const [isBusy, setBusy] = useState(false);
   const [actionError, setActionError] = useState(null);
   const [courses, setCourses] = useState([]);
   const [selectedCouSn, setSelectedCouSn] = useState(null);
-  const [year, setYear] = useState(new Date().getFullYear());
+  const [year, setYear] = useState("");
   const [semesterType, setSemesterType] = useState("");
+  const [generatedValues, setGeneratedValues] = useState({
+    class_no: "",
+    semester: "",
+    name: "",
+  });
 
-  // 生成班次号和学期
+  // 在useEffect中添加调试输出
   useEffect(() => {
-    if (!formRef.current) return;
-    if (!courses) return;
-    if (!selectedCouSn) return;
+    console.log("当前表单值:", {
+      selectedCouSn,
+      location: formRef.current?.elements.location.value,
+      classinfo,
+    });
+  }, [selectedCouSn, classinfo]);
 
-    let course = courses.find(
-      //表单传入的元素属性使用前端的名称，而fieldName使用后端classinfo的名称
-      (c) => c.course_sn == selectedCouSn
-    );
-    if (course && year && semesterType) {
-      fetch(
+  // 自动生成班次号、学期和名称的函数
+  const generateClassInfo = async () => {
+    if (!isNew) return; // 编辑模式下不自动生成
+    if (!selectedCouSn || !year || !semesterType) return;
+
+    //表单传入的元素属性使用前端的名称，而fieldName使用后端classinfo的名称
+    const course = courses.find((c) => c.course_sn == selectedCouSn);
+    if (!course) return;
+
+    try {
+      const response = await fetch(
         `/api/class/sequence?cou_sn=${selectedCouSn}&year=${year}&semesterType=${semesterType}`
-      )
-        .then((res) => res.json())
-        .then((data) => {
-          // 自动生成班次号：课程号-当前年份-学期类型-序号（使用课程对象的 course_no）
-          let nextSeq = (data.max_sequence || 0) + 1;
-          let classNo = `${course.course_no}-${year}S${semesterType}-${nextSeq
-            .toString()
-            .padStart(2, "0")}`;
-          formRef.current.elements.class_no.value = classNo;
-          // 自动生成学期：年份区间+学期类型（使用本地状态 year 和 semesterType）
-          formRef.current.elements.semester.value = `${year}-${
-            Number(year) + 1
-          }-${semesterType}`;
+      );
+      const data = await response.json();
 
-          // 当名称为空或匹配自动生成模式时，自动生成班次名称：课程名 + 序号
-          let className = `${course.course_name}_${nextSeq
-            .toString()
-            .padStart(2, "0")}`;
-          if (
-            !formRef.current.elements.name.value ||
-            formRef.current.elements.name.value.startsWith(course.course_name)
-          ) {
-            formRef.current.elements.name.value = className;
-          }
-        });
+      // 自动生成班次号：课程号-当前年份-学期类型-序号（使用课程对象的 course_no）
+      const nextSeq = (data.max_sequence || 0) + (isNew ? 1 : 0); // 编辑时不增加序号
+      const classNo = `${course.course_no}-${year}S${semesterType}-${nextSeq
+        .toString()
+        .padStart(2, "0")}`;
+
+      // 自动生成学期：年份区间+学期类型（使用本地状态 year 和 semesterType）
+      const semester = `${year}-${Number(year) + 1}-${semesterType}`;
+
+      // 自动生成班次名称：课程名 + 序号
+      const className = `${course.course_name}_${nextSeq
+        .toString()
+        .padStart(2, "0")}`;
+
+      setGeneratedValues({
+        class_no: classNo,
+        semester: semester,
+        name: className,
+      });
+      setDirty(true);
+    } catch (error) {
+      console.error("生成班次信息失败:", error);
+    }
+  };
+
+  // 当课程、年份或学期类型变化时，重新生成信息
+  useEffect(() => {
+    if (isNew) {
+      generateClassInfo();
     }
   }, [courses, year, semesterType, selectedCouSn]);
 
   // 获取课程列表，设置表单初始值
   useEffect(() => {
-    if (!formRef.current) return;
     if (!classinfo) return;
+
+    // 检查是否有保存的状态值（来自导航）
+    if (location.state?.preservedValues) {
+      setGeneratedValues(location.state.preservedValues);
+      setSelectedCouSn(
+        location.state.preservedValues.cou_sn || classinfo.cou_sn
+      );
+      setYear(location.state.preservedValues.semester?.split("-")[0] || "");
+      setSemesterType(
+        location.state.preservedValues.semester?.split("-")[2] || ""
+      );
+      setDirty(false);
+      return;
+    }
 
     fetch("/api/course/list", {
       headers: {
@@ -68,16 +102,26 @@ function ClassDetail({ classinfo }) {
       .then((res) => res.json())
       .then((data) => setCourses(data)); // 从后端获取课程列表数据
 
-    const elements = formRef.current.elements;
-    elements.class_no.value = classinfo.class_no ?? "";
-    elements.name.value = classinfo.name ?? "";
-    elements.semester.value = classinfo.semester ?? null;
-    elements.location.value = classinfo.location ?? null;
-    elements.cou_sn.value = classinfo.cou_sn ?? null;
-
+    // 编辑模式下设置初始值
+    if (!isNew) {
+      // 编辑现有班次
+      setSelectedCouSn(classinfo.cou_sn);
+      setYear(classinfo.semester?.split("-")[0] || "");
+      setSemesterType(classinfo.semester?.split("-")[2] || "");
+      setGeneratedValues({
+        class_no: classinfo.class_no || "",
+        semester: classinfo.semester || "",
+        name: classinfo.name || "",
+      });
+      // 设置地点初始值（新增）
+      if (formRef.current && classinfo.location) {
+        formRef.current.elements.location.value = classinfo.location;
+      }
+    }
     setDirty(false);
-  }, [classinfo]);
+  }, [classinfo, isNew, location.state]); // 添加location.state依赖
 
+  // 表单值变化时检查是否有变化
   const checkChange = (e) => {
     if (!formRef.current) return;
 
@@ -86,22 +130,27 @@ function ClassDetail({ classinfo }) {
       return;
     }
 
-    for (let fieldName of [
-      "class_no",
-      "name",
-      "semester",
-      "location",
-      "cou_sn",
-    ]) {
-      if (classinfo[fieldName] !== formRef.current.elements[fieldName].value) {
-        if (!isDirty) setDirty(true);
-        return;
-      }
-    }
+    const currentValues = {
+      class_no: generatedValues.class_no,
+      name: formRef.current.elements.name.value,
+      semester: generatedValues.semester,
+      location: formRef.current.elements.location.value,
+      cou_sn: selectedCouSn,
+    };
 
-    if (isDirty) {
-      setDirty(false);
-    }
+    const originalValues = {
+      class_no: classinfo.class_no || "",
+      name: classinfo.name || "",
+      semester: classinfo.semester || "",
+      location: classinfo.location || "",
+      cou_sn: classinfo.cou_sn || null,
+    };
+
+    const hasChanged = Object.keys(currentValues).some(
+      (key) => currentValues[key] !== originalValues[key]
+    );
+
+    setDirty(hasChanged);
   };
   // 表单提交处理
   const saveAction = async () => {
@@ -110,12 +159,33 @@ function ClassDetail({ classinfo }) {
       navigate("/login");
       return;
     }
+    if (!isNew) {
+      // 编辑模式下的额外校验
+      const original = {
+        name: classinfo.name,
+        cou_sn: classinfo.cou_sn,
+        semester: classinfo.semester,
+        class_no: classinfo.class_no,
+      };
+
+      const current = {
+        name: formRef.current.elements.name.value,
+        cou_sn: Number(formRef.current.elements.cou_sn.value),
+        semester: generatedValues.semester,
+        class_no: generatedValues.class_no,
+      };
+
+      if (JSON.stringify(original) !== JSON.stringify(current)) {
+        setActionError("仅允许修改地点字段");
+        return;
+      }
+    }
     if (!formRef.current) return;
     if (!formRef.current?.elements.cou_sn.value) {
       setActionError("请选择关联课程");
       return;
     }
-    if (year === "" || semesterType === "0") {
+    if (year === "" || semesterType === "") {
       setActionError("请先选择学年和学期类型");
       return;
     }
@@ -123,24 +193,21 @@ function ClassDetail({ classinfo }) {
     const elements = formRef.current.elements;
     const data = {
       class_sn: classinfo.class_sn,
-      class_no: elements.class_no.value,
+      class_no: generatedValues.class_no, // 使用状态值而不是直接取DOM
       name: elements.name.value,
-      semester: elements.semester.value,
+      semester: generatedValues.semester, // 使用状态值
       location: elements.location.value,
       cou_sn: Number(elements.cou_sn.value),
     };
-    // 添加空值校验
-    if (!data.class_no || !data.semester || !data.cou_sn) {
-      setActionError("所有带*字段为必填项");
-      return;
-    }
+
     try {
       setBusy(true);
+      setActionError(null);
 
       let url = data.class_sn ? `/api/class/${data.class_sn}` : "/api/class";
       let method = data.class_sn ? "PUT" : "POST";
 
-      let response = await fetch(url, {
+      const response = await fetch(url, {
         method,
         headers: {
           "Content-Type": "application/json;charset=utf-8",
@@ -153,16 +220,28 @@ function ClassDetail({ classinfo }) {
 
       if (!response.ok) {
         // TODO:
-        console.error(response);
         const error = await response.json();
         throw new Error(error.detail);
       }
 
       const class_data = await response.json();
-      if (classinfo.class_sn === null) {
-        navigate(`/class/${class_data.class_sn}`);
-        return;
-      }
+
+      // 修改导航逻辑 - 传递状态避免重新生成
+      navigate(`/class/${class_data.class_sn}`, {
+        state: {
+          preservedValues: {
+            class_no: data.class_no,
+            semester: data.semester,
+            name: data.name,
+            // 保留其他必要字段
+            cou_sn: data.cou_sn,
+            location: data.location,
+          },
+          // 标记这是从创建流程过来的
+          fromCreate: true,
+        },
+        replace: true, // 使用replace而不是push，避免历史记录问题
+      });
     } catch (error) {
       setActionError(error.message);
     } finally {
@@ -189,14 +268,14 @@ function ClassDetail({ classinfo }) {
   return (
     <>
       <div className="paper-body">
-        <form ref={formRef} onChange={() => setDirty(true)}>
+        <form ref={formRef} onChange={checkChange}>
           <div className="field">
             <label>关联课程：</label>
             <select
               name="cou_sn"
               onChange={(e) => {
-                setDirty(true);
                 setSelectedCouSn(e.target.value); // 更新选择的课程SN
+                setDirty(true);
               }}
             >
               <option value="">请选择课程</option>
@@ -213,8 +292,11 @@ function ClassDetail({ classinfo }) {
             <label>起始学年：</label>
             <select
               value={year}
-              onChange={(e) => setYear(e.target.value)}
-              required
+              name="year"
+              onChange={(e) => {
+                setYear(e.target.value);
+                setDirty(true);
+              }}
             >
               <option value="">请选择学年</option>
               {Array.from(
@@ -232,8 +314,11 @@ function ClassDetail({ classinfo }) {
             <label>学期类型：</label>
             <select
               value={semesterType}
-              onChange={(e) => setSemesterType(e.target.value)}
-              required
+              name="semesterType"
+              onChange={(e) => {
+                setSemesterType(e.target.value);
+                setDirty(true);
+              }}
             >
               <option value="">请选择学期</option>
               <option value="1">秋季学期</option>
@@ -243,59 +328,44 @@ function ClassDetail({ classinfo }) {
 
           <div className="field">
             <label>班次名称：</label>
-            <div style={{ position: "relative" }}>
-              <input
-                name="name"
-                onFocus={(e) => {
-                  if (
-                    e.target.value ===
-                    `${
-                      courses.find((c) => c.course_sn == selectedCouSn)
-                        ?.course_name || ""
-                    }01`
-                  ) {
-                    e.target.value = "";
-                  }
-                }}
-              />
-              {/* 提示文字 */}
-              <div
-                style={{
-                  position: "absolute",
-                  right: "8px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "#999",
-                  pointerEvents: "none",
-                  display: formRef.current?.elements.name.value
-                    ? "none"
-                    : "block",
-                }}
-              >
-                {selectedCouSn ? "" : "选择课程后将自动生成"}
-              </div>
+            <div className="generated-value">
+              <span>{generatedValues.name}</span>
+              <input type="hidden" name="name" value={generatedValues.name} />
             </div>
           </div>
 
           <div className="field">
             <label>班次号：</label>
             <div className="generated-value">
-              <span>{formRef.current?.elements.class_no.value}</span>
-              <input type="hidden" name="class_no" />
+              <span>{generatedValues.class_no}</span>
+              <input
+                type="hidden"
+                name="class_no"
+                value={generatedValues.class_no}
+              />
             </div>
           </div>
 
           <div className="field">
             <label>学期：</label>
             <div className="generated-value">
-              <span>{formRef.current?.elements.semester.value}</span>
-              <input type="hidden" name="semester" />
+              <span>{generatedValues.semester}</span>
+              <input
+                type="hidden"
+                name="semester"
+                value={generatedValues.semester}
+              />
             </div>
           </div>
 
           <div className="field">
             <label>地点：</label>
-            <input type="text" name="location" onChange={checkChange} />
+            <input
+              type="text"
+              name="location"
+              defaultValue={classinfo?.location || ""}
+              onChange={checkChange}
+            />
           </div>
         </form>
       </div>
