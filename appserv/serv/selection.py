@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from typing import List
 import datetime as dt
@@ -18,46 +18,28 @@ class StudentSelection(BaseModel):
             summary="获取班次关联学生")
 async def get_class_students(
     class_sn: int,
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_active_user)
 ):
     """获取指定班次已关联的学生列表"""
     validate_jiaomi_role(current_user.user_name)
 
-    offset = (page - 1) * page_size
     with dblock() as db:
         db.execute("""
             SELECT s.sn AS stu_sn, 
                    s.no AS stu_no, 
                    s.name AS stu_name, 
                    s.gender, 
-                   s.enrollment_date,
-                   COUNT(*) OVER() AS total_count
+                   s.enrollment_date
             FROM student AS s
             JOIN class_student AS cs ON s.sn = cs.stu_sn
             WHERE cs.class_sn = %(class_sn)s
             ORDER BY s.no
-            LIMIT %(limit)s OFFSET %(offset)s
             """, 
-            {
-                "class_sn": class_sn,
-                "limit": page_size,
-                "offset": offset
-            }
+            {"class_sn": class_sn,}
         )
         
-        rows = [asdict(row) for row in db]
-        total = rows[0]["total_count"] if rows else 0
+        return [asdict(row) for row in db]
 
-        return {
-            "data": rows,
-            "pagination": {
-                "total": total,
-                "page": page,
-                "page_size": page_size
-            }
-        }
 
 
 @router.get("/api/class/{class_sn}/students/available", 
@@ -71,14 +53,20 @@ async def get_available_students(
     
     with dblock() as db:
         db.execute("""
-            SELECT s.sn, s.no, s.name, s.gender
-            FROM student s
-            WHERE s.sn NOT IN (
+            SELECT s.sn AS stu_sn, 
+                   s.no AS stu_no, 
+                   s.name AS stu_name, 
+                   s.gender, 
+                   s.enrollment_date
+
+
+            FROM student AS s
+            WHERE s.sn AS stu_sn NOT IN (
                 SELECT stu_sn 
                 FROM class_student
                 WHERE class_sn = %(class_sn)s
             )
-            ORDER BY s.no
+            ORDER BY s.no, s.name
             """, {"class_sn": class_sn})
         return [asdict(row) for row in db]
 
@@ -96,11 +84,12 @@ async def link_students_to_class(
     with dblock() as db:
         # 检查班次是否存在
         db.execute("""
-            SELECT sn AS class_sn, class_no, name, semester, location, cou_sn 
+            SELECT sn AS class_sn, 
+                   class_no, name, semester, location, cou_sn 
             FROM class 
-            WHERE sn = %s FOR UPDATE
+            WHERE sn = %(class_sn)s FOR UPDATE
             """, 
-             (class_sn,)
+             {"class_sn": class_sn}
         )
         if not db.fetchone():
             raise HTTPException(404, "班次不存在")
@@ -108,9 +97,9 @@ async def link_students_to_class(
         # 检查所有学生是否存在
         db.execute("""
             SELECT array_agg(sn) FROM student 
-            WHERE sn = ANY(%s)
+            WHERE sn = ANY(%(student_sns)s)
             """, 
-            (selection.student_sns,)
+            {"student_sns": selection.student_sns}
         )
         existing = db.fetchone()[0] or [] # type: ignore
         if len(existing) != len(selection.student_sns):
@@ -127,11 +116,11 @@ async def link_students_to_class(
                        unnest(%(student_sns)s), 
                        %(now)s
                     WHERE NOT EXISTS (
-                        SELECT 1 FROM class_student 
+                        SELECT class_sn, stu_sn FROM class_student 
                         WHERE class_sn = %(class_sn)s 
                         AND stu_sn = unnest(%(student_sns)s)
                     )
-                    RETURNING 1
+                    RETURNING class_sn, stu_sn
                 )
                 SELECT COUNT(*) FROM inserted
                 """, 

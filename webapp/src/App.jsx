@@ -3,7 +3,13 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { StudentHome, StudentList, StudentEdit, StudentNew } from "./student";
 import { CourseHome, CourseList, CourseEdit, CourseNew } from "./course";
 import { GradeHome, GradeList, GradeEdit } from "./grade";
-import { ClassHome, ClassList, ClassEdit, ClassNew } from "./class";
+import {
+  ClassHome,
+  ClassList,
+  ClassEdit,
+  ClassNew,
+  ClassStudentSelection,
+} from "./class";
 import { Login } from "./login";
 import { PublicRoutes, PrivateRoutes, AuthProvider } from "./routes";
 import NaviMenu from "./NaviMenu";

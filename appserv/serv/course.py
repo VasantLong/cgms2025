@@ -1,12 +1,13 @@
 import asyncio
 from dataclasses import asdict
-from fastapi import status, APIRouter
+from fastapi import status, APIRouter, Query, Depends
 import datetime as dt
 from fastapi import HTTPException
 
 from pydantic import BaseModel, field_validator
 from .config import app, dblock
 from .error import ConflictError, InvalidError
+from .auth import get_current_active_user, User
 
 router = APIRouter(tags=["课程管理"])
 
@@ -35,17 +36,28 @@ class Course(BaseModel):
             raise ValueError("api：学时必须大于0")
         return v
 
-@router.get("/api/course/list")
-async def get_course_list() -> list[Course]:
+@router.get("/api/course/list", summary="获取课程列表")
+async def get_course_list(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_active_user)
+):
+    offset = (page - 1) * page_size
     with dblock() as db:
         db.execute("""
-        SELECT sn AS course_sn, no AS course_no, name AS course_name, credit, hours
-        FROM course
-        ORDER BY no, name
-        """)
-        data = [Course(**asdict(row)) for row in db]
-
-    return data
+            SELECT 
+                c.sn AS course_sn,
+                c.no AS course_no,
+                c.name AS course_name,
+                c.credit,
+                c.hours
+            FROM course AS c
+            ORDER BY c.no
+            LIMIT %(limit)s OFFSET %(offset)s
+            """,
+            {"limit": page_size, "offset": offset}
+        )
+        return [asdict(row) for row in db]
 
 
 @router.get("/api/course/{course_sn}")

@@ -1,4 +1,6 @@
-function SearchBar({ placeholder, onSearch }) {
+import { useState } from "react";
+
+export function SearchBar({ placeholder, onSearch }) {
   const [input, setInput] = useState("");
 
   const handleSearch = (e) => {
@@ -18,5 +20,3 @@ function SearchBar({ placeholder, onSearch }) {
     </form>
   );
 }
-
-export { SearchBar };

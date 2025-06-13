@@ -37,3 +37,15 @@
   top: 0;
   background: #f5f5f5;
 }
+
+.empty-table {
+  text-align: center;
+  padding: 20px;
+  color: #888;
+}
+
+.loading-indicator {
+  padding: 10px;
+  text-align: center;
+  color: #1890ff;
+}

@@ -14,12 +14,12 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
       "@components": path.resolve(__dirname, "./src/components"),
-      "@class": path.resolve(__dirname, "./src/class"),
-      "@course": path.resolve(__dirname, "./src/course"),
-      "@grade": path.resolve(__dirname, "./src/grade"),
-      "@student": path.resolve(__dirname, "./src/student"),
-      "@login": path.resolve(__dirname, "./src/login"),
-      "@routes": path.resolve(__dirname, "./src/routes"),
     },
+  },
+  optimizeDeps: {
+    include: [
+      "swr",
+      "swr/infinite", // 显式包含无限加载模块
+    ],
   },
 });

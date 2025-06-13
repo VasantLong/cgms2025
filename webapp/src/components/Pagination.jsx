@@ -1,4 +1,4 @@
-function Pagination({ isLoading, onLoadMore }) {
+export function Pagination({ isLoading, onLoadMore }) {
   return (
     <div className="pagination">
       <button onClick={onLoadMore} disabled={isLoading}>
@@ -7,5 +7,3 @@ function Pagination({ isLoading, onLoadMore }) {
     </div>
   );
 }
-
-export { Pagination };

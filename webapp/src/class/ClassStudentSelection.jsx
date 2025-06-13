@@ -1,52 +1,102 @@
 import { useEffect, useState, useMemo } from "react";
-import { useSWR, useSWRInfinite } from "swr";
+import useSWR from "swr";
+import useSWRInfinite from "swr/infinite";
 import { fetcher } from "../utils";
-import SearchBar from "@components/SearchBar";
-import Pagination from "@components/Pagination";
+import { SearchBar } from "@components/SearchBar";
+import { Pagination } from "@components/Pagination";
 import "./student-selection.css";
 
 export default function ClassStudentSelection({ classinfo }) {
-  // 分页获取所有学生（改进点1）
-  const { data, size, setSize, isValidating } = useSWRInfinite(
+  useEffect(() => {
+    if (!classinfo?.class_sn) {
+      navigate("/class/list");
+    }
+  }, [classinfo]);
+
+  // 1. 首先定义所有状态和SWR hooks
+  const [selectedStudents, setSelectedStudents] = useState(new Map()); // 选中学生状态（改进点2：使用Map存储附加信息）
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState(""); // 搜索过滤状态
+
+  // 2. 安全获取学生数据：分页获取所有学生
+  const studentFetcher = async (url) => {
+    const res = await fetcher(url);
+    // 处理两种API响应结构
+    if (Array.isArray(res)) return res; // 对于直接返回数组的API
+    if (res?.data) return res.data; // 对于分页结构的API
+    return [];
+  };
+  const { data, size, setSize, isValidating, error } = useSWRInfinite(
     (index) => `/api/student/list?page=${index + 1}&page_size=20`,
     fetcher
   );
-
-  // 平铺分页数据
-  const allStudents = useMemo(() => data?.flat() || [], [data]);
-
-  // 获取已关联学生（带分页）
-  const { data: linkedStudents } = useSWR(
-    `/api/class/${classinfo.class_sn}/students?page=1&page_size=1000`,
-    fetcher
-  );
-
-  // 选中学生状态（改进点2：使用Map存储附加信息）
-  const [selectedStudents, setSelectedStudents] = useState(new Map());
-
-  // 搜索过滤状态
-  const [searchTerm, setSearchTerm] = useState("");
-
-  // 初始化已选学生（改进点3：存储完整学生信息）
+  if (error) {
+    console.error("Error loading student data:", error);
+    return <div>加载学生数据时出错</div>;
+  }
+  // 添加调试
   useEffect(() => {
-    if (linkedStudents && allStudents.length > 0) {
+    console.log("SWR Infinite raw data:", data);
+  }, [data]);
+
+  // 3. 仅在class_sn存在时请求关联学生（带分页）
+  const { data: linkedResponse, error: linkedError } = useSWR(
+    classinfo?.class_sn // 添加class_sn存在性检查
+      ? `/api/class/${classinfo.class_sn}/students`
+      : null,
+    (url) => fetcher(url)
+  );
+  if (linkedError) {
+    console.error("Error loading linked students:", linkedError);
+    return <div>加载已关联学生时出错</div>;
+  }
+
+  // 4. 处理数据格式
+  const allStudents = useMemo(() => {
+    if (!data) return [];
+    // 根据实际API响应结构调整
+    // 因为/api/student/list返回的是完整数组，不是分页结构
+    return data ? data.flat() : [];
+  }, [data]);
+
+  const linkedStudents = useMemo(() => {
+    return Array.isArray(linkedResponse?.data) ? linkedResponse.data : [];
+  }, [linkedResponse]);
+  // 过滤学生列表（改进点4）
+  const filteredStudents = useMemo(() => {
+    if (!Array.isArray(allStudents)) return [];
+    return allStudents.filter(
+      (
+        student // 添加空值保护：在过滤逻辑中添加可选链操作符（?.）
+      ) =>
+        student?.stu_no?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        student?.stu_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [allStudents, searchTerm]);
+
+  useEffect(() => {
+    console.log("Current data state:", {
+      allStudents,
+      linkedStudents,
+      selectedStudents: Array.from(selectedStudents.keys()),
+    });
+  }, [allStudents, linkedStudents, selectedStudents]);
+
+  // 5. 安全的初始化逻辑:初始化已选学生（改进点3：存储完整学生信息）
+  useEffect(() => {
+    if (linkedStudents?.length && allStudents.length) {
       const initialMap = new Map();
-      linkedStudents.forEach((s) => {
-        const student = allStudents.find((stu) => stu.stu_sn === s.stu_sn);
-        if (student) initialMap.set(s.stu_sn, student);
+      linkedStudents.forEach((linkedStudent) => {
+        const fullStudent = allStudents.find(
+          (s) => s?.stu_sn === linkedStudent?.stu_sn
+        );
+        if (fullStudent) {
+          initialMap.set(linkedStudent.stu_sn, fullStudent);
+        }
       });
       setSelectedStudents(initialMap);
     }
   }, [linkedStudents, allStudents]);
-
-  // 过滤学生列表（改进点4）
-  const filteredStudents = useMemo(() => {
-    return allStudents.filter(
-      (student) =>
-        student.stu_no.includes(searchTerm) ||
-        student.stu_name.includes(searchTerm)
-    );
-  }, [allStudents, searchTerm]);
 
   // 处理勾选变化（改进点5：批量操作支持）
   const handleCheck = (student, isBatch = false) => {
@@ -75,14 +125,14 @@ export default function ClassStudentSelection({ classinfo }) {
   // 提交关联（改进点6：分批提交）
   const handleSubmit = async () => {
     try {
+      setIsSubmitting(true); // 开始提交
       const batchSize = 50; // 每批50个学生
       const studentArray = Array.from(selectedStudents.keys());
 
       for (let i = 0; i < studentArray.length; i += batchSize) {
         const batch = studentArray.slice(i, i + batchSize);
-        await fetch(`/api/class/${classinfo.class_sn}/students`, {
+        await fetcher(`/api/class/${classinfo.class_sn}/students`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ student_sns: batch }),
         });
       }
@@ -90,31 +140,24 @@ export default function ClassStudentSelection({ classinfo }) {
       alert(`成功关联 ${studentArray.length} 名学生`);
     } catch (err) {
       alert(`关联失败: ${err.message}`);
+    } finally {
+      setIsSubmitting(false); // 结束提交
     }
   };
 
   return (
     <div className="student-selection">
-      <div className="selection-header">
-        <h4>当前班次：{classinfo.name}</h4>
-        <div className="selection-actions">
-          <span>已选: {selectedStudents.size}人</span>
-          <button
-            onClick={handleSubmit}
-            className="btn primary"
-            disabled={selectedStudents.size === 0}
-          >
-            提交关联
-          </button>
-        </div>
-      </div>
-
       {/* 新增搜索和批量操作栏（改进点7） */}
       <div className="selection-toolbar">
         <SearchBar placeholder="搜索学号或姓名..." onSearch={setSearchTerm} />
-        <div className="batch-actions">
-          <button onClick={() => handleBatchSelect(true)}>全选当页</button>
-          <button onClick={() => handleBatchSelect(false)}>取消当页</button>
+        <div className="selection-info">
+          <span>已选: {selectedStudents.size}人</span>
+          <button
+            onClick={handleSubmit}
+            disabled={selectedStudents.size === 0 || isSubmitting}
+          >
+            {isSubmitting ? "提交中..." : "保存关联"}
+          </button>
         </div>
       </div>
 
@@ -139,6 +182,13 @@ export default function ClassStudentSelection({ classinfo }) {
             </tr>
           </thead>
           <tbody>
+            {filteredStudents.length === 0 && (
+              <tr>
+                <td colSpan="5" className="empty-table">
+                  {searchTerm ? "没有找到匹配的学生" : "暂无学生数据"}
+                </td>
+              </tr>
+            )}
             {filteredStudents.map((student) => (
               <tr key={student.stu_sn}>
                 <td>
@@ -152,7 +202,9 @@ export default function ClassStudentSelection({ classinfo }) {
                 <td>{student.stu_name}</td>
                 <td>{student.gender === "M" ? "男" : "女"}</td>
                 <td>
-                  {linkedStudents?.some((s) => s.stu_sn === student.stu_sn)
+                  {linkedStudents?.data?.some(
+                    (s) => s.stu_sn === student.stu_sn
+                  )
                     ? "已关联"
                     : "未关联"}
                 </td>
