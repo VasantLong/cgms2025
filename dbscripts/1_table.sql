@@ -4,8 +4,8 @@ CREATE TABLE IF NOT EXISTS student  (
     no       VARCHAR(10)        -- 学号（格式：230650118）
         CHECK (no ~ '^\d{9}$'), -- 8位数字校验
     name     TEXT NOT NULL,
-    gender   CHAR(1)            -- 性别F/M/O
-        CHECK (gender IN ('F', 'M', 'O')),
+    gender   CHAR(1)            -- 性别F/M
+        CHECK (gender IN ('F', 'M')),
     enrollment_date DATE        -- 入学日期
         CHECK (enrollment_date > '2000-01-01'), -- 合理范围校验
     PRIMARY KEY (sn),

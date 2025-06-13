@@ -40,7 +40,9 @@ function App() {
             <Route path="/class" element={<ClassHome />}>
               <Route path="list" element={<ClassList />} />
               <Route path="new" element={<ClassNew />} />
-              <Route path=":classSn" element={<ClassEdit />} />
+              <Route path=":classSn" element={<ClassEdit />}>
+                <Route path="students" element={<ClassStudentSelection />} />
+              </Route>
             </Route>
             {/* 默认路由规则 */}
             <Route path="/" element={<Navigate to="/grade/list" replace />} />

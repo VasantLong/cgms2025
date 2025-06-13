@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import ClassStudentSelection from "@class/ClassStudentSelection";
 import "./class.css";
 
 function ClassDetail({ classinfo }) {
@@ -19,6 +20,8 @@ function ClassDetail({ classinfo }) {
     semester: "",
     name: "",
   });
+  // 新增状态管理选课标签页
+  const [activeTab, setActiveTab] = useState("basic");
 
   // 在useEffect中添加调试输出
   useEffect(() => {
