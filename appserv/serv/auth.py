@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, field_validator
@@ -29,7 +29,7 @@ pwd_context = CryptContext(
 )
 
 # OAuth2 方案
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = HTTPBearer()
 
 class Token(BaseModel):
     access_token: str
@@ -62,6 +62,9 @@ async def get_user(username: str) -> Optional[User]:
         )
         row = db.fetchone()
     
+        if not row:
+            return None
+    
     return User(user_sn=row.user_sn, user_name=row.username) # type: ignore
 
 async def authenticate_user(username: str, password: str) -> Optional[User]:
@@ -83,10 +86,8 @@ async def authenticate_user(username: str, password: str) -> Optional[User]:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
+    expire = datetime.now(timezone.utc) + (expires_delta 
+                                           or timedelta(minutes=15))  # 默认15分钟
     to_encode.update({
         "exp": expire,
         "user_sn": data.get("user_sn"),
@@ -95,7 +96,8 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)) -> User:
+    token = credentials.credentials  # 关键修复：提取真正的token字符串
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -106,8 +108,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
         username: str = payload.get("username") # type: ignore
         if not username:
             raise credentials_exception
-    except JWTError:
-        raise credentials_exception
+    except JWTError as e:
+        raise credentials_exception from e
     
     user = await get_user(username)
     if user is None:

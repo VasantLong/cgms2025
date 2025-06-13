@@ -1,6 +1,6 @@
 # main.py
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Body
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from pydantic import BaseModel
@@ -105,7 +105,7 @@ async def create_user(user_data: UserCreate):
         # 哈希模式存储密码
         hashed_password = get_password_hash(password)
         db.execute("""
-            INSERT INTO passwords (user_sn, hashed_password)
+            INSERT INTO user_passwords (user_sn, hashed_password)
             VALUES (%(user_sn)s, %(hashed_password)s)
             """,{
                 "user_sn": user.user_sn,  # type: ignore

@@ -74,6 +74,27 @@ ALTER TABLE class
 ALTER TABLE class ADD COLUMN class_seq SMALLINT;
 
 
+-- === 选课关联表（学生与班次关系）
+DROP TABLE IF EXISTS class_student;
+CREATE TABLE IF NOT EXISTS class_student (
+    id          SERIAL PRIMARY KEY,         -- 自增主键
+    stu_sn      INTEGER NOT NULL            -- 学生序号（关联student.sn），确保学生删除时自动清理关联记录
+        REFERENCES student(sn) ON DELETE CASCADE,
+    class_sn    INTEGER NOT NULL            -- 班次序号（关联class.sn）
+        REFERENCES class(sn) ON DELETE CASCADE,
+    created_at  TIMESTAMP DEFAULT NOW(),    -- 选课时间（自动记录创建时间）
+    -- 唯一约束：防止重复关联
+    UNIQUE (stu_sn, class_sn)
+);
+
+-- 新增级联更新
+ALTER TABLE class_student 
+  DROP CONSTRAINT class_student_class_sn_fkey,
+  ADD CONSTRAINT class_student_class_sn_fkey 
+    FOREIGN KEY (class_sn) REFERENCES class(sn)
+    ON UPDATE CASCADE;  
+
+
 -- === 成绩表
 DROP TABLE IF EXISTS class_grade;
 CREATE TABLE IF NOT EXISTS class_grade  (
@@ -115,11 +136,14 @@ CREATE TABLE IF NOT EXISTS user_passwords (
 
 
 -- 为常用查询添加索引
+CREATE INDEX idx_class_semester ON class(semester);
+CREATE INDEX idx_class_student_stu ON class_student(stu_sn);
+CREATE INDEX idx_class_student_class ON class_student(class_sn);
 CREATE INDEX idx_class_grade_student ON class_grade(stu_sn);
 CREATE INDEX idx_class_grade_class ON class_grade(class_sn);
-CREATE INDEX idx_class_semester ON class(semester);
 CREATE INDEX idx_user_passwords_user_sn ON user_passwords(user_sn);
 CREATE INDEX idx_sys_users_name ON sys_users USING BTREE (username);
+
 
 -- 优化多条件查询
 CREATE INDEX idx_grade_stu_class ON class_grade(stu_sn, class_sn);
