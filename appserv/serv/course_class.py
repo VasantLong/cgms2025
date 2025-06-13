@@ -189,8 +189,12 @@ async def update_class(
             location=%(location)s,
             cou_sn=%(cou_sn)s 
             WHERE sn=%(class_sn)s
+            RETURNING sn as class_sn, class_no, name, semester, location, cou_sn
             """,
-            class_data.model_dump()
+            {
+                "location": class_data.location,
+                "class_sn": class_sn
+            }
         )
     return class_data
 

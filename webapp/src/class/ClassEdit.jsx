@@ -30,6 +30,7 @@ function ClassEdit(props) {
     ? { ...classinfo, ...location.state.preservedValues }
     : classinfo;
   console.log("Merged Class Info:", mergedClassInfo);
+  console.log("Selected Course SN:", mergedClassInfo.cou_sn);
 
   return (
     <div className="paper">

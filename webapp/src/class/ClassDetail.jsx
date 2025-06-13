@@ -100,7 +100,13 @@ function ClassDetail({ classinfo }) {
       },
     })
       .then((res) => res.json())
-      .then((data) => setCourses(data)); // 从后端获取课程列表数据
+      .then((data) => {
+        setCourses(data);
+        // 确保在数据加载后设置初始值
+        if (!isNew) {
+          setSelectedCouSn(classinfo.cou_sn);
+        }
+      }); // 从后端获取课程列表数据
 
     // 编辑模式下设置初始值
     if (!isNew) {
@@ -113,7 +119,7 @@ function ClassDetail({ classinfo }) {
         semester: classinfo.semester || "",
         name: classinfo.name || "",
       });
-      // 设置地点初始值（新增）
+      // 设置地点初始值
       if (formRef.current && classinfo.location) {
         formRef.current.elements.location.value = classinfo.location;
       }
@@ -169,8 +175,8 @@ function ClassDetail({ classinfo }) {
       };
 
       const current = {
-        name: formRef.current.elements.name.value,
-        cou_sn: Number(formRef.current.elements.cou_sn.value),
+        name: generatedValues.name,
+        cou_sn: Number(selectedCouSn),
         semester: generatedValues.semester,
         class_no: generatedValues.class_no,
       };
@@ -273,6 +279,7 @@ function ClassDetail({ classinfo }) {
             <label>关联课程：</label>
             <select
               name="cou_sn"
+              value={selectedCouSn || ""} // 添加value属性
               onChange={(e) => {
                 setSelectedCouSn(e.target.value); // 更新选择的课程SN
                 setDirty(true);
