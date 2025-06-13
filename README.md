@@ -23,15 +23,15 @@
 
 1. [ x ] **完善课程基础信息**（任务 3）
    - 分支：feature/course-basic-info
-   - 前端：React 表单组件(webapp/src/course/CourseList.jsx)
+   - 前端：React 表单组件(webapp/src/course)
    - 后端：RESTful API(appserv/serv/course.py)
    - 数据库：PostgreSQL 表设计(dbscripts/1_table.sql)
    - 依赖关系：无
    - 用户角色：教秘
-2. [ ]**课程分班次功能**（任务 1、2、4）
-   - 分支：feature/course-class-scheduling
-   - 前端：React 表格组件(webapp/src/grade/GradeList.jsx)
-   - 后端：RESTful API(appserv/serv/grade.py)
+2. [ x ]**课程分班次功能**（任务 1、2、4）
+   - 分支：feat/course-class-scheduling
+   - 前端：React 表格组件(webapp/src/class)
+   - 后端：RESTful API(appserv/serv/course_class.py)
    - 数据库：PostgreSQL 表设计(dbscripts/1_table.sql)
    - 依赖关系：需要课程基础信息
    - 功能说明：
@@ -63,12 +63,17 @@
    - 数据库：PostgreSQL 视图(dbscripts/1_table.sql)
    - 依赖关系：需要成绩查询功能
 
-### 团队分工方案（4 人）
+###
 
 ## 项目完成情况
 
 - 任务 3 v3.4.0：
-  数据库表 course 包含课程号、课程名、学分、学时字段；后端 appserv/serv/course.py 实现了课程信息的 CRUD 接口；前端 webapp/src/course/CourseDetail.jsx 包含课程号、课程名、学分、学时的表单组件。任务 3 的要求已全部达标。
+
+  - 数据库表 course 包含课程号、课程名、学分、学时字段；
+
+  - 后端 appserv/serv/course.py 实现了课程信息的 CRUD 接口；
+
+  - 前端 webapp/src/course/CourseDetail.jsx 包含课程号、课程名、学分、学时的表单组件
 
 - 任务 1：设置教秘用户角色及登录权限。v4.0.0
 
@@ -98,6 +103,12 @@
 
          把 your_32byte_random_string_here 替换成第一行的一串码，删除第一行的码
 
+- 任务 2、4：班次增删改查与表单自动填写逻辑。v4.1.0
+
+  - 班次号逻辑修改成：'课程号-年份学期-序号'（如 10055-2023S1-01）
+  - 修改班次信息时，只允许修改地点字段
+  - 增加登录状态检验
+
 1. 张三
    1. ….
    2. ….
@@ -118,4 +129,4 @@
 3. v4.0.0
    - feat/login-auth
 4. v4.1.0
-   - feature/course-class-scheduling
+   - feat/course-class-scheduling
