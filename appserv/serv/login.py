@@ -24,7 +24,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30  # 设置访问令牌的过期时间为30分钟
 
 # 初始化限流器
 limiter = Limiter(key_func=get_remote_address)
-router = APIRouter()
+router = APIRouter(tags=["用户认证"])
 
 # 定义请求体模型
 class UserCreate(BaseModel):
@@ -37,12 +37,12 @@ class LoginRequest(BaseModel):
     password: str
 
 
-@app.get("/api/show-secret")
+@router.get("/api/show-secret")
 async def show_secret():
     return {"SECRET_KEY": os.getenv("SECRET_KEY")}
 
 # 登录接口
-@app.post("/api/token", response_model=Token)
+@router.post("/api/token", response_model=Token)
 @limiter.limit("5/minute")  # 添加速率限制
 async def login_for_access_token(
     request: Request,
@@ -67,11 +67,11 @@ async def login_for_access_token(
         "username": user.user_name
     }
 
-@app.get("/api/users/me/", response_model=User)
+@router.get("/api/users/me/", response_model=User)
 async def read_users_me(current_user: User = Depends(get_current_active_user)):
     return current_user
 
-@app.post("/api/users/")
+@router.post("/api/users/")
 async def create_user(user_data: UserCreate):
     username = user_data.username
     password = user_data.password
@@ -116,7 +116,7 @@ async def create_user(user_data: UserCreate):
     return {"username": username, "message": "User created successfully"}
 
 # 新增密码修改接口
-@app.post("/api/change-password")
+@router.post("/api/change-password")
 async def change_password(
     current_user: User = Depends(get_current_active_user),
     new_password: str = Body(..., embed=True)

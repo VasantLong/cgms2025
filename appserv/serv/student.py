@@ -2,12 +2,13 @@ import asyncio  # noqa: F401
 from dataclasses import asdict
 from fastapi import status
 import datetime as dt
-from fastapi import HTTPException
+from fastapi import HTTPException, APIRouter
 
 from pydantic import BaseModel, field_validator
 from .config import app, dblock
 from .error import ConflictError, InvalidError
 
+router = APIRouter(tags=["学生管理"])
 
 class Student(BaseModel):
     stu_sn: int | None
@@ -29,7 +30,7 @@ class Student(BaseModel):
         return v
 
 
-@app.get("/api/student/list")
+@router.get("/api/student/list")
 async def get_student_list() -> list[Student]:
     with dblock() as db:
         db.execute("""
@@ -42,7 +43,7 @@ async def get_student_list() -> list[Student]:
     return data
 
 
-@app.get("/api/student/{stu_sn}")
+@router.get("/api/student/{stu_sn}")
 async def get_student_profile(stu_sn) -> Student:
     with dblock() as db:
         db.execute(
@@ -62,7 +63,7 @@ async def get_student_profile(stu_sn) -> Student:
     return row
 
 
-@app.post("/api/student", status_code=status.HTTP_201_CREATED)
+@router.post("/api/student", status_code=status.HTTP_201_CREATED)
 async def new_student(student: Student) -> Student:
     stu_no = student.stu_no
 
@@ -96,7 +97,7 @@ async def new_student(student: Student) -> Student:
 
 
 
-@app.put("/api/student/{stu_sn}")
+@router.put("/api/student/{stu_sn}")
 async def update_student(stu_sn: int, student: Student):
     assert student.stu_sn == stu_sn
 
@@ -114,7 +115,7 @@ async def update_student(stu_sn: int, student: Student):
         )
 
 
-@app.delete("/api/student/{stu_sn}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/api/student/{stu_sn}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_student(stu_sn):
     with dblock() as db:
         db.execute("DELETE FROM student WHERE sn=%(stu_sn)s", {"stu_sn": stu_sn})

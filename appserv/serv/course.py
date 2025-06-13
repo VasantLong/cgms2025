@@ -1,6 +1,6 @@
 import asyncio
 from dataclasses import asdict
-from fastapi import status
+from fastapi import status, APIRouter
 import datetime as dt
 from fastapi import HTTPException
 
@@ -8,6 +8,7 @@ from pydantic import BaseModel, field_validator
 from .config import app, dblock
 from .error import ConflictError, InvalidError
 
+router = APIRouter(tags=["课程管理"])
 
 class Course(BaseModel):
     course_sn: int | None
@@ -34,8 +35,7 @@ class Course(BaseModel):
             raise ValueError("api：学时必须大于0")
         return v
 
-
-@app.get("/api/course/list")
+@router.get("/api/course/list")
 async def get_course_list() -> list[Course]:
     with dblock() as db:
         db.execute("""
@@ -48,7 +48,7 @@ async def get_course_list() -> list[Course]:
     return data
 
 
-@app.get("/api/course/{course_sn}")
+@router.get("/api/course/{course_sn}")
 async def get_course_profile(course_sn) -> Course:
     with dblock() as db:
         db.execute(
@@ -68,7 +68,7 @@ async def get_course_profile(course_sn) -> Course:
     return row
 
 
-@app.post("/api/course", status_code=status.HTTP_201_CREATED)
+@router.post("/api/course", status_code=status.HTTP_201_CREATED)
 async def new_course(course: Course) -> Course:
     course_no = course.course_no
     #course_dict = course.model_dump()
@@ -100,7 +100,7 @@ async def new_course(course: Course) -> Course:
     return course
 
 
-@app.put("/api/course/{course_sn}")
+@router.put("/api/course/{course_sn}")
 async def update_course(course_sn: int, course: Course):
     assert course_sn == course.course_sn
     course_no = course.course_no
@@ -115,7 +115,7 @@ async def update_course(course_sn: int, course: Course):
         )
 
 
-@app.delete("/api/course/{course_sn}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/api/course/{course_sn}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_course(course_sn):
     with dblock() as db:
         db.execute("DELETE FROM course WHERE sn=%(course_sn)s", {"course_sn": course_sn})

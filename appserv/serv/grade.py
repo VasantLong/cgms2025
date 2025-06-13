@@ -1,13 +1,13 @@
 import asyncio
 from dataclasses import asdict
-from fastapi import status
 import datetime as dt
-from fastapi import HTTPException
+from fastapi import HTTPException, APIRouter,status
 
 from pydantic import BaseModel, field_validator
 from .config import app, dblock
 from .error import ConflictError, InvalidError
 
+router = APIRouter(tags=["成绩管理"])
 
 class Grade(BaseModel):
     stu_sn: int
@@ -21,13 +21,13 @@ class Grade(BaseModel):
         return v
 
 # 在grade.py添加测试路由
-@app.get("/api/debug/test")
+@router.get("/api/debug/test")
 async def debug_test():
     with dblock() as db:
         db.execute("SELECT * FROM class_grade")
         return {"count": len(list(db)), "first_5": list(db)[:5]}
     
-@app.get("/api/grade/list")
+@router.get("/api/grade/list")
 async def get_grade_list() -> list[dict]:
     with dblock() as db:
         db.execute("""
@@ -50,7 +50,7 @@ async def get_grade_list() -> list[dict]:
     return data
 
 
-@app.get("/api/grade/student/{stu_sn}/course/{course_sn}")
+@router.get("/api/grade/student/{stu_sn}/course/{course_sn}")
 async def get_grade(stu_sn: int, course_sn: int):
     with dblock() as db:
         db.execute("""
@@ -61,7 +61,7 @@ async def get_grade(stu_sn: int, course_sn: int):
         """, (stu_sn, course_sn))
     return db.fetchone()
 
-@app.post("/api/grade", status_code=status.HTTP_201_CREATED)
+@router.post("/api/grade", status_code=status.HTTP_201_CREATED)
 async def create_grade(grade: Grade) -> dict:
     with dblock() as db:
         db.execute(
@@ -84,7 +84,7 @@ async def create_grade(grade: Grade) -> dict:
 
     return row
 
-@app.put("/api/grade/{stu_sn}/{cou_sn}")
+@router.put("/api/grade/{stu_sn}/{cou_sn}")
 async def update_grade(stu_sn: int, cou_sn: int, grade: Grade) -> dict:
     assert stu_sn == grade.stu_sn
     assert cou_sn == grade.course_sn
@@ -112,7 +112,7 @@ async def update_grade(stu_sn: int, cou_sn: int, grade: Grade) -> dict:
 
     return row
 
-@app.delete("/api/grade/{stu_sn}/{cou_sn}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/api/grade/{stu_sn}/{cou_sn}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_grade(stu_sn: int, cou_sn: int):
     with dblock() as db:
         db.execute(
