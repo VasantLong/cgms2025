@@ -27,7 +27,6 @@ const ClassTable = (props) => {
           <th className="col-name">名称</th>
           <th className="col-semester">学期</th>
           <th className="col-location">地点</th>
-          <th className="col-course_sn">课程SN</th>
         </tr>
       </thead>
       <tbody>
@@ -35,14 +34,13 @@ const ClassTable = (props) => {
           items.map((item, idx) => (
             <tr key={idx}>
               <td>
-                <Link to={`/class/${item.class_no}`}>
+                <Link to={`/class/${item.class_sn}`}>
                   {item.class_no ? item.class_no : "（空）"}
                 </Link>
               </td>
               <td>{item.name}</td>
               <td>{item.semester}</td>
               <td>{item.location}</td>
-              <td>{item.course_sn}</td>
             </tr>
           ))}
       </tbody>

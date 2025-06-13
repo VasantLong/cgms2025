@@ -11,7 +11,7 @@ from .error import ConflictError, InvalidError
 
 class Grade(BaseModel):
     stu_sn: int
-    course_sn: int
+    course_sn: int# ？？？？？为什么不是 class_sn
     grade: float | None
 
     @field_validator('grade')

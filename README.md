@@ -109,10 +109,13 @@
 
 ## 项目开发过程分支
 
-1. v3.4.0
+1. v3.5.0
    - feature/course-basic-info
+2. v3.6.0
    - feat/sql-info-debug
    - feat/stu_cou-info-debug
-   - feat/gradeinfo-debug
-2. v4.0.0
+   - feat/grade-info-debug
+3. v4.0.0
    - feat/login-auth
+4. v4.1.0
+   - feature/course-class-scheduling
