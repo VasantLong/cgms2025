@@ -172,7 +172,7 @@ async def update_class(
         course_no_part = class_no.split('-')[0]
         db.execute(
             """
-            SELECT 1 FROM course 
+            SELECT sn AS course_sn, no AS course_no FROM course 
             WHERE sn=%(cou_sn)s AND no=%(course_no)s
             """,
             {"cou_sn": class_data.cou_sn, "course_no": course_no_part}
@@ -180,22 +180,29 @@ async def update_class(
         if not db.fetchone():
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "班次号中的课程号与关联课程不匹配")
         
-        # 更新数据库
+        # 更新数据库 - 确保只更新允许的字段（地点）
+        update_data = {
+            "class_sn": class_sn,
+            "location": class_data.location,
+            # 确保其他字段保持不变
+            "class_no": class_data.class_no,
+            "name": class_data.name,
+            "semester": class_data.semester,
+            "cou_sn": class_data.cou_sn
+        }
+
         db.execute("""
             UPDATE class SET 
-            class_no=%(class_no)s, 
-            name=%(name)s,
-            semester=%(semester)s,
-            location=%(location)s,
-            cou_sn=%(cou_sn)s 
+            location=%(location)s
             WHERE sn=%(class_sn)s
             RETURNING sn as class_sn, class_no, name, semester, location, cou_sn
             """,
-            {
-                "location": class_data.location,
-                "class_sn": class_sn
-            }
+            update_data
         )
+        row = db.fetchone()
+        if not row:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "班次不存在")
+    
     return class_data
 
 @app.delete("/api/class/{class_sn}", status_code=status.HTTP_204_NO_CONTENT)

@@ -227,7 +227,8 @@ function ClassDetail({ classinfo }) {
       if (!response.ok) {
         // TODO:
         const error = await response.json();
-        throw new Error(error.detail);
+        console.error("API Error:", error);
+        throw new Error(error.detail || "更新班次信息失败");
       }
 
       const class_data = await response.json();
