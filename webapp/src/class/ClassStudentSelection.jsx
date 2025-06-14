@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import useSWR from "swr";
+import useSWR, { mutate } from "swr";
 import useSWRInfinite from "swr/infinite";
 import { fetcher } from "../utils";
 import { SearchBar } from "@components/SearchBar";
@@ -28,7 +28,12 @@ export default function ClassStudentSelection({ classinfo }) {
   };
   const { data, size, setSize, isValidating, error } = useSWRInfinite(
     (index) => `/api/student/list?page=${index + 1}&page_size=20`,
-    fetcher
+    fetcher,
+    {
+      dedupingInterval: 30000, // 30秒内相同请求合并
+      revalidateOnFocus: false, // 禁止焦点切换时重新请求
+      revalidateFirstPage: false, // 保持第一页数据稳定
+    }
   );
   if (error) {
     console.error("Error loading student data:", error);
@@ -39,12 +44,22 @@ export default function ClassStudentSelection({ classinfo }) {
     console.log("SWR Infinite raw data:", data);
   }, [data]);
 
-  // 3. 仅在class_sn存在时请求关联学生（带分页）
-  const { data: linkedResponse, error: linkedError } = useSWR(
+  // 3. 仅在class_sn存在时请求关联学生（带分页）（添加防抖和缓存更新）
+  const {
+    data: linkedResponse,
+    mutate,
+    error: linkedError,
+  } = useSWR(
     classinfo?.class_sn // 添加class_sn存在性检查
       ? `/api/class/${classinfo.class_sn}/students`
       : null,
-    (url) => fetcher(url)
+    fetcher,
+    {
+      dedupingInterval: 30000, // 30秒内相同请求合并
+      revalidateOnReconnect: false,
+      revalidateOnFocus: false, // 新增此配置
+      shouldRetryOnError: false, // 可选添加错误时停止重试
+    }
   );
   if (linkedError) {
     console.error("Error loading linked students:", linkedError);
@@ -60,7 +75,13 @@ export default function ClassStudentSelection({ classinfo }) {
   }, [data]);
 
   const linkedStudents = useMemo(() => {
-    return Array.isArray(linkedResponse?.data) ? linkedResponse.data : [];
+    console.log("linkedResponse:", linkedResponse); // 调试
+    // 根据API实际响应结构调整
+    return Array.isArray(linkedResponse?.data)
+      ? linkedResponse.data
+      : Array.isArray(linkedResponse)
+      ? linkedResponse
+      : [];
   }, [linkedResponse]);
   // 过滤学生列表（改进点4）
   const filteredStudents = useMemo(() => {
@@ -82,9 +103,14 @@ export default function ClassStudentSelection({ classinfo }) {
     });
   }, [allStudents, linkedStudents, selectedStudents]);
 
+  useEffect(() => {
+    console.log("SWR触发条件变化:", classinfo?.class_sn);
+  }, [classinfo?.class_sn]);
+
   // 5. 安全的初始化逻辑:初始化已选学生（改进点3：存储完整学生信息）
   useEffect(() => {
-    if (linkedStudents?.length && allStudents.length) {
+    console.log("Linked Students:", linkedStudents); // 添加调试日志
+    if (linkedStudents.length > 0 && allStudents.length > 0) {
       const initialMap = new Map();
       linkedStudents.forEach((linkedStudent) => {
         const fullStudent = allStudents.find(
@@ -122,28 +148,50 @@ export default function ClassStudentSelection({ classinfo }) {
     setSelectedStudents(newMap);
   };
 
-  // 提交关联（改进点6：分批提交）
+  // 提交关联（改进点6：分批提交）（添加缓存失效机制）
   const handleSubmit = async () => {
     try {
       setIsSubmitting(true); // 开始提交
       const batchSize = 50; // 每批50个学生
       const studentArray = Array.from(selectedStudents.keys());
 
-      for (let i = 0; i < studentArray.length; i += batchSize) {
-        const batch = studentArray.slice(i, i + batchSize);
-        await fetcher(`/api/class/${classinfo.class_sn}/students`, {
+      // 1. 执行POST请求并获取响应
+      const { added_count, students } = await fetcher(
+        `/api/class/${classinfo.class_sn}/students`,
+        {
           method: "POST",
-          body: JSON.stringify({ student_sns: batch }),
-        });
-      }
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ student_sns: studentArray }),
+        }
+      );
 
-      alert(`成功关联 ${studentArray.length} 名学生`);
+      // 2. 更新SWR缓存
+      mutate(`/api/class/${classinfo.class_sn}/students`, students, false);
+
+      alert(`成功关联 ${added_count} 名学生`);
+
+      // 3. 清空选中状态（根据需求可选）
+      setSelectedStudents(new Map());
     } catch (err) {
-      alert(`关联失败: ${err.message}`);
+      console.error("关联失败详情:", err);
+      alert(`关联失败: ${err.message || "未知错误"}`);
     } finally {
       setIsSubmitting(false); // 结束提交
     }
   };
+
+  useEffect(() => {
+    // 提交完成后检查数据一致性
+    if (!isSubmitting && linkedStudents.length > 0) {
+      const unsynced = Array.from(selectedStudents.keys()).filter(
+        (sn) => !linkedStudents.some((s) => s.stu_sn === sn)
+      );
+
+      if (unsynced.length > 0) {
+        console.warn("存在未同步的选中学生:", unsynced);
+      }
+    }
+  }, [linkedStudents, isSubmitting, selectedStudents]);
 
   return (
     <div className="student-selection">
@@ -202,10 +250,10 @@ export default function ClassStudentSelection({ classinfo }) {
                 <td>{student.stu_name}</td>
                 <td>{student.gender === "M" ? "男" : "女"}</td>
                 <td>
-                  {linkedStudents?.data?.some(
-                    (s) => s.stu_sn === student.stu_sn
-                  )
-                    ? "已关联"
+                  {isSubmitting && selectedStudents.has(student.stu_sn)
+                    ? "保存中..."
+                    : linkedStudents.some((s) => s.stu_sn === student.stu_sn)
+                    ? "✓ 已关联"
                     : "未关联"}
                 </td>
               </tr>

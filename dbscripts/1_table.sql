@@ -93,7 +93,9 @@ ALTER TABLE class_student
   ADD CONSTRAINT class_student_class_sn_fkey 
     FOREIGN KEY (class_sn) REFERENCES class(sn)
     ON UPDATE CASCADE;  
-
+ALTER TABLE class_student 
+  ADD CONSTRAINT uniq_class_student 
+    UNIQUE (class_sn, stu_sn);
 
 -- === 成绩表
 DROP TABLE IF EXISTS class_grade;
@@ -139,6 +141,7 @@ CREATE TABLE IF NOT EXISTS user_passwords (
 CREATE INDEX idx_class_semester ON class(semester);
 CREATE INDEX idx_class_student_stu ON class_student(stu_sn);
 CREATE INDEX idx_class_student_class ON class_student(class_sn);
+CREATE INDEX idx_class_student_composite ON class_student (class_sn, stu_sn);
 CREATE INDEX idx_class_grade_student ON class_grade(stu_sn);
 CREATE INDEX idx_class_grade_class ON class_grade(class_sn);
 CREATE INDEX idx_user_passwords_user_sn ON user_passwords(user_sn);
