@@ -28,7 +28,7 @@
    - 数据库：PostgreSQL 表设计(dbscripts/1_table.sql)
    - 依赖关系：无
    - 用户角色：教秘
-2. [ x ]**课程分班次功能**（任务 1、2、4）
+2. [ x ] **课程分班次功能**（任务 1、2、4）
    - 分支：feat/course-class-scheduling
    - 前端：React 表格组件(webapp/src/class)
    - 后端：RESTful API(appserv/serv/course_class.py)
@@ -38,25 +38,25 @@
      1. 创建班次：班次号、班次名、学期、地点、课程
      2. 班次管理：增删改查班次信息
      3. 用户角色：教秘
-3. []**选课功能**（任务 5）
-   - 分支：feature/student-selection
-   - 前端：React 选择器组件(webapp/src/student/StudentTable.jsx)
-   - 后端：RESTful API(appserv/serv/student.py)
-   - 数据库：PostgreSQL 表设计(dbscripts/1_table.sql)
+3. [ x ] **选课功能**（任务 5）
+   - 分支：feat/student-selection
+   - 前端：ClassStudentSelection.jsx，公用组件 SearchBar.jsx 和 Pagination.jsx
+   - 后端：RESTful API(appserv/serv/selection.py)
+   - 数据库：PostgreSQL 表设计
    - 依赖关系：需要班次管理功能
-4. [ ]**成绩录入**（任务 6）
+4. [ ] **成绩录入**（任务 6）
    - 分支：feature/grade-entry
    - 前端：React 表单组件(webapp/src/grade/GradeList.jsx)
    - 后端：批量导入 API(appserv/serv/grade.py)
    - 数据库：PostgreSQL 表设计(dbscripts/1_table.sql)
    - 依赖关系：需要选课功能
-5. [ ]**成绩查询**（任务 7）
+5. [ ] **成绩查询**（任务 7）
    - 分支：feature/grade-query
    - 前端：React 查询组件(webapp/src/grade/GradeList.jsx)
    - 后端：复杂查询 API(appserv/serv/grade.py)
    - 数据库：PostgreSQL 索引优化(dbscripts/1_table.sql)
    - 依赖关系：需要成绩录入功能
-6. [ ]**报表生成**（任务 8）
+6. [ ] **报表生成**（任务 8）
    - 分支：feature/report-generation
    - 前端：React 报表组件(webapp/src/student/StudentDetail.jsx)
    - 后端：报表生成 API(appserv/serv/student.py)
@@ -67,7 +67,7 @@
 
 ## 项目完成情况
 
-- 任务 3 v3.4.0：
+- 任务 3 ==v3.4.0==：
 
   - 数据库表 course 包含课程号、课程名、学分、学时字段；
 
@@ -75,7 +75,7 @@
 
   - 前端 webapp/src/course/CourseDetail.jsx 包含课程号、课程名、学分、学时的表单组件
 
-- 任务 1：设置教秘用户角色及登录权限。v4.0.0
+- 任务 1：设置教秘用户角色及登录权限。==v4.0.0==
 
   - 用户名: jiaomi_admin
 
@@ -103,11 +103,17 @@
 
          把 your_32byte_random_string_here 替换成第一行的一串码，删除第一行的码
 
-- 任务 2、4：班次增删改查与表单自动填写逻辑。v4.1.0
+- 任务 2、4：班次增删改查与表单自动填写逻辑。==v4.1.0==
 
   - 班次号逻辑修改成：'课程号-年份学期-序号'（如 10055-2023S1-01）
   - 修改班次信息时，只允许修改地点字段
   - 增加登录状态检验
+
+- 任务 5：某一班次详情下的学生管理栏。 ==v4.2.0==
+  - 添加缓存，修改身份认证方法，提供分页（待优化）
+  - 数据库表 class_student 包含班级序号、学生序号、选课时间
+  - 后端 selection.py 具体实现了选课时的逻辑查询（可选学生、是否有学生已在当前课程其余班次的冲突情况）
+  - 前端 ClassStudentSelection.jsx 融入 ClassDetail.jsx 中，在原有的编辑班次界面进行分栏（基本信息、学生管理），区分可选和有冲突的学生。
 
 1. 张三
    1. ….
@@ -130,3 +136,5 @@
    - feat/login-auth
 4. v4.1.0
    - feat/course-class-scheduling
+5. v4.2.0
+   - feat/student-selection
