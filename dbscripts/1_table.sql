@@ -4,8 +4,8 @@ CREATE TABLE IF NOT EXISTS student  (
     no       VARCHAR(10)        -- 学号（格式：230650118）
         CHECK (no ~ '^\d{9}$'), -- 8位数字校验
     name     TEXT NOT NULL,
-    gender   CHAR(1)            -- 性别F/M/O
-        CHECK (gender IN ('F', 'M', 'O')),
+    gender   CHAR(1)            -- 性别F/M
+        CHECK (gender IN ('F', 'M')),
     enrollment_date DATE        -- 入学日期
         CHECK (enrollment_date > '2000-01-01'), -- 合理范围校验
     PRIMARY KEY (sn),
@@ -74,6 +74,35 @@ ALTER TABLE class
 ALTER TABLE class ADD COLUMN class_seq SMALLINT;
 
 
+-- === 选课关联表（学生与班次关系）
+DROP TABLE IF EXISTS class_student;
+CREATE TABLE IF NOT EXISTS class_student (
+    id          SERIAL PRIMARY KEY,         -- 自增主键
+    stu_sn      INTEGER NOT NULL            -- 学生序号（关联student.sn），确保学生删除时自动清理关联记录
+        REFERENCES student(sn) ON DELETE CASCADE,
+    class_sn    INTEGER NOT NULL            -- 班次序号（关联class.sn）
+        REFERENCES class(sn) ON DELETE CASCADE,
+    created_at  TIMESTAMP DEFAULT NOW(),    -- 选课时间（自动记录创建时间）
+    -- 唯一约束：防止重复关联
+    UNIQUE (stu_sn, class_sn)
+);
+
+-- 新增级联更新
+ALTER TABLE class_student 
+  DROP CONSTRAINT class_student_class_sn_fkey,
+  ADD CONSTRAINT class_student_class_sn_fkey 
+    FOREIGN KEY (class_sn) REFERENCES class(sn)
+    ON UPDATE CASCADE;  
+ALTER TABLE class_student 
+  ADD CONSTRAINT uniq_class_student 
+    UNIQUE (class_sn, stu_sn);
+ALTER TABLE class_student
+  ADD CONSTRAINT unique_student_course 
+    UNIQUE (stu_sn, 
+    (SELECT cou_sn 
+    FROM class 
+    WHERE class.sn = class_student.class_sn));
+
 -- === 成绩表
 DROP TABLE IF EXISTS class_grade;
 CREATE TABLE IF NOT EXISTS class_grade  (
@@ -115,11 +144,15 @@ CREATE TABLE IF NOT EXISTS user_passwords (
 
 
 -- 为常用查询添加索引
+CREATE INDEX idx_class_semester ON class(semester);
+CREATE INDEX idx_class_student_stu ON class_student(stu_sn);
+CREATE INDEX idx_class_student_class ON class_student(class_sn);
+CREATE INDEX idx_class_student_composite ON class_student (class_sn, stu_sn);
 CREATE INDEX idx_class_grade_student ON class_grade(stu_sn);
 CREATE INDEX idx_class_grade_class ON class_grade(class_sn);
-CREATE INDEX idx_class_semester ON class(semester);
 CREATE INDEX idx_user_passwords_user_sn ON user_passwords(user_sn);
 CREATE INDEX idx_sys_users_name ON sys_users USING BTREE (username);
+
 
 -- 优化多条件查询
 CREATE INDEX idx_grade_stu_class ON class_grade(stu_sn, class_sn);
@@ -127,3 +160,24 @@ CREATE INDEX idx_grade_stu_class ON class_grade(stu_sn, class_sn);
 -- 加速课程关联查询
 CREATE INDEX idx_class_course ON class 
     USING BTREE (sn, cou_sn);
+
+-- === 确保一个学生只能关联到同一课程的一个班次
+-- 添加辅助列并创建函数索引
+ALTER TABLE class_student ADD COLUMN cou_sn INTEGER;
+
+-- 通过触发器或更新语句维护这个列
+CREATE OR REPLACE FUNCTION set_class_cou_sn()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.cou_sn := (SELECT cou_sn FROM class WHERE sn = NEW.class_sn);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_set_cou_sn
+BEFORE INSERT OR UPDATE ON class_student
+FOR EACH ROW EXECUTE FUNCTION set_class_cou_sn();
+
+-- 创建唯一索引
+CREATE UNIQUE INDEX idx_student_course_unique 
+ON class_student (stu_sn, cou_sn);

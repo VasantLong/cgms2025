@@ -34,9 +34,6 @@ function ClassEdit(props) {
 
   return (
     <div className="paper">
-      <div className="paper-head">
-        <h3>{`班次信息：${classinfo.name} (#${classinfo.class_sn})`}</h3>
-      </div>
       <ClassDetail classinfo={mergedClassInfo} />
     </div>
   );

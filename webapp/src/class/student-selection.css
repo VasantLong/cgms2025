@@ -1,0 +1,66 @@
+/* student-selection.css */
+.student-selection {
+  padding: 20px;
+}
+
+.selection-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 15px;
+}
+
+.selection-toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.table-container {
+  max-height: 500px;
+  overflow-y: auto;
+  border: 1px solid #eee;
+}
+
+.list-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.list-table th,
+.list-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.list-table th {
+  position: sticky;
+  top: 0;
+  background: #f5f5f5;
+}
+
+.empty-table {
+  text-align: center;
+  padding: 20px;
+  color: #888;
+}
+
+.loading-indicator {
+  padding: 10px;
+  text-align: center;
+  color: #1890ff;
+}
+
+.conflict-tooltip {
+  margin-left: 4px;
+  color: #ff4d4f;
+  cursor: help;
+}
+
+input[type="checkbox"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.conflict-row {
+  background-color: #fff2f0;
+}

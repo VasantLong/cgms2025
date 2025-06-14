@@ -2,13 +2,15 @@ import asyncio
 from dataclasses import asdict
 from fastapi import status, Depends, Query
 import datetime as dt
-from fastapi import HTTPException
+from fastapi import HTTPException, APIRouter
 import re
 
 from pydantic import BaseModel, field_validator
 from .config import app, dblock
 from .error import ConflictError, InvalidError
 from .auth import get_current_user, get_current_active_user, User
+
+router = APIRouter(tags=["班次管理"])
 
 class Class(BaseModel):
     class_sn: int | None
@@ -34,7 +36,7 @@ def validate_jiaomi_role(username: str):
             detail="仅教秘用户可执行此操作"
         )
 
-@app.get("/api/class/list")
+@router.get("/api/class/list")
 async def get_class_list() -> list[Class]:
     with dblock() as db:
         db.execute("""
@@ -47,7 +49,7 @@ async def get_class_list() -> list[Class]:
     return data
 
 # 获取指定课程在特定学年学期下的最新班次序号
-@app.get("/api/class/sequence")
+@router.get("/api/class/sequence")
 async def get_class_sequence(
     cou_sn: int, 
     year: int, 
@@ -79,7 +81,7 @@ async def get_class_sequence(
         max_sequence = row.max_seq if (row and row.max_seq is not None) else 0
         return {"max_sequence": max_sequence}
 
-@app.get("/api/class/{class_sn}")
+@router.get("/api/class/{class_sn}")
 async def get_class_profile(class_sn) -> Class:
     with dblock() as db:
         db.execute(
@@ -99,7 +101,7 @@ async def get_class_profile(class_sn) -> Class:
     return row
 
 # 确认课程号包含在班次号中
-@app.post("/api/class", status_code=status.HTTP_201_CREATED)
+@router.post("/api/class", status_code=status.HTTP_201_CREATED)
 async def create_class(
     class_data: Class, 
     current_user: User = Depends(get_current_active_user)
@@ -144,7 +146,7 @@ async def create_class(
     return class_data
 
 
-@app.put("/api/class/{class_sn}")
+@router.put("/api/class/{class_sn}")
 async def update_class(
     class_sn: int, 
     class_data: Class,
@@ -205,7 +207,7 @@ async def update_class(
     
     return class_data
 
-@app.delete("/api/class/{class_sn}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/api/class/{class_sn}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_class(
     class_sn: int,
     current_user: User = Depends(get_current_active_user)

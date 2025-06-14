@@ -1,13 +1,15 @@
 import asyncio
 from dataclasses import asdict
-from fastapi import status
+from fastapi import status, APIRouter, Query, Depends, HTTPException
+from fastapi_cache.decorator import cache
 import datetime as dt
-from fastapi import HTTPException
 
 from pydantic import BaseModel, field_validator
 from .config import app, dblock
 from .error import ConflictError, InvalidError
+from .auth import get_current_active_user, User
 
+router = APIRouter(tags=["课程管理"])
 
 class Course(BaseModel):
     course_sn: int | None
@@ -34,21 +36,32 @@ class Course(BaseModel):
             raise ValueError("api：学时必须大于0")
         return v
 
-
-@app.get("/api/course/list")
-async def get_course_list() -> list[Course]:
+@router.get("/api/course/list", summary="获取课程列表")
+@cache(expire=300)  # 添加5分钟缓存
+async def get_course_list(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_active_user)
+):
+    offset = (page - 1) * page_size
     with dblock() as db:
         db.execute("""
-        SELECT sn AS course_sn, no AS course_no, name AS course_name, credit, hours
-        FROM course
-        ORDER BY no, name
-        """)
-        data = [Course(**asdict(row)) for row in db]
+            SELECT 
+                c.sn AS course_sn,
+                c.no AS course_no,
+                c.name AS course_name,
+                c.credit,
+                c.hours
+            FROM course AS c
+            ORDER BY c.no
+            LIMIT %(limit)s OFFSET %(offset)s
+            """,
+            {"limit": page_size, "offset": offset}
+        )
+        return [asdict(row) for row in db]
 
-    return data
 
-
-@app.get("/api/course/{course_sn}")
+@router.get("/api/course/{course_sn}")
 async def get_course_profile(course_sn) -> Course:
     with dblock() as db:
         db.execute(
@@ -68,7 +81,7 @@ async def get_course_profile(course_sn) -> Course:
     return row
 
 
-@app.post("/api/course", status_code=status.HTTP_201_CREATED)
+@router.post("/api/course", status_code=status.HTTP_201_CREATED)
 async def new_course(course: Course) -> Course:
     course_no = course.course_no
     #course_dict = course.model_dump()
@@ -100,7 +113,7 @@ async def new_course(course: Course) -> Course:
     return course
 
 
-@app.put("/api/course/{course_sn}")
+@router.put("/api/course/{course_sn}")
 async def update_course(course_sn: int, course: Course):
     assert course_sn == course.course_sn
     course_no = course.course_no
@@ -115,7 +128,7 @@ async def update_course(course_sn: int, course: Course):
         )
 
 
-@app.delete("/api/course/{course_sn}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/api/course/{course_sn}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_course(course_sn):
     with dblock() as db:
         db.execute("DELETE FROM course WHERE sn=%(course_sn)s", {"course_sn": course_sn})

@@ -1,13 +1,14 @@
 import asyncio  # noqa: F401
 from dataclasses import asdict
-from fastapi import status
+from fastapi import status, Query
 import datetime as dt
-from fastapi import HTTPException
+from fastapi import HTTPException, APIRouter
 
 from pydantic import BaseModel, field_validator
 from .config import app, dblock
 from .error import ConflictError, InvalidError
 
+router = APIRouter(tags=["学生管理"])
 
 class Student(BaseModel):
     stu_sn: int | None
@@ -28,21 +29,40 @@ class Student(BaseModel):
             raise ValueError("入学日期必须在2000年1月1日之后")
         return v
 
-
-@app.get("/api/student/list")
-async def get_student_list() -> list[Student]:
+# 分页到时候再说
+ #   page: int = Query(1, ge=1),
+  #  page_size: int = Query(20, ge=1, le=100
+@router.get("/api/student/list")
+async def get_student_list(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    last_sn: int = Query(None)  # 新增参数
+) -> list[Student]:
     with dblock() as db:
-        db.execute("""
+        query = """
         SELECT sn AS stu_sn, no AS stu_no, name AS stu_name, gender, enrollment_date 
         FROM student
-        ORDER BY no, name
-        """)
+        """
+        params = {}
+
+        # 添加游标分页条件
+        if last_sn:
+            query += " WHERE sn > %(last_sn)s"
+            params["last_sn"] = last_sn
+        # 没有游标时使用传统分页
+        else:
+            params["offset"] = (page - 1) * page_size
+
+        query += " ORDER BY sn LIMIT %(limit)s"
+        params["limit"] = page_size
+        
+        db.execute(query, params)
         data = [Student(**asdict(row)) for row in db]
 
     return data
 
 
-@app.get("/api/student/{stu_sn}")
+@router.get("/api/student/{stu_sn}")
 async def get_student_profile(stu_sn) -> Student:
     with dblock() as db:
         db.execute(
@@ -62,7 +82,7 @@ async def get_student_profile(stu_sn) -> Student:
     return row
 
 
-@app.post("/api/student", status_code=status.HTTP_201_CREATED)
+@router.post("/api/student", status_code=status.HTTP_201_CREATED)
 async def new_student(student: Student) -> Student:
     stu_no = student.stu_no
 
@@ -96,7 +116,7 @@ async def new_student(student: Student) -> Student:
 
 
 
-@app.put("/api/student/{stu_sn}")
+@router.put("/api/student/{stu_sn}")
 async def update_student(stu_sn: int, student: Student):
     assert student.stu_sn == stu_sn
 
@@ -114,7 +134,7 @@ async def update_student(stu_sn: int, student: Student):
         )
 
 
-@app.delete("/api/student/{stu_sn}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/api/student/{stu_sn}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_student(stu_sn):
     with dblock() as db:
         db.execute("DELETE FROM student WHERE sn=%(stu_sn)s", {"stu_sn": stu_sn})

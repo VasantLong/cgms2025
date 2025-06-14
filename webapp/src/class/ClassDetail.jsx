@@ -1,5 +1,7 @@
 import { useRef, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { fetcher } from "../utils";
+import ClassStudentSelection from "./ClassStudentSelection";
 import "./class.css";
 
 function ClassDetail({ classinfo }) {
@@ -19,6 +21,8 @@ function ClassDetail({ classinfo }) {
     semester: "",
     name: "",
   });
+  // 新增状态管理选课标签页
+  const [activeTab, setActiveTab] = useState("basic");
 
   // 在useEffect中添加调试输出
   useEffect(() => {
@@ -106,7 +110,20 @@ function ClassDetail({ classinfo }) {
         if (!isNew) {
           setSelectedCouSn(classinfo.cou_sn);
         }
-      }); // 从后端获取课程列表数据
+      })
+      .catch((error) => {
+        console.error("加载课程失败:", error);
+        // 添加网络错误处理
+        if (error.message.includes("Failed to fetch")) {
+          setActionError("网络连接异常，请检查网络后重试");
+        } else if (error.message.includes("401")) {
+          localStorage.removeItem("token");
+          navigate("/login", { replace: true });
+        } else {
+          setActionError(`加载课程失败: ${error.message}`);
+        }
+        setCourses([]); // 确保设置为空数组
+      });
 
     // 编辑模式下设置初始值
     if (!isNew) {
@@ -274,133 +291,182 @@ function ClassDetail({ classinfo }) {
 
   return (
     <>
-      <div className="paper-body">
-        <form ref={formRef} onChange={checkChange}>
-          <div className="field">
-            <label>关联课程：</label>
-            <select
-              name="cou_sn"
-              value={selectedCouSn || ""} // 添加value属性
-              onChange={(e) => {
-                setSelectedCouSn(e.target.value); // 更新选择的课程SN
-                setDirty(true);
-              }}
-            >
-              <option value="">请选择课程</option>
-              {/* courses来自后端Course */}
-              {courses.map((course) => (
-                <option key={course.course_sn} value={course.course_sn}>
-                  {course.course_name} ({course.course_no})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="field">
-            <label>起始学年：</label>
-            <select
-              value={year}
-              name="year"
-              onChange={(e) => {
-                setYear(e.target.value);
-                setDirty(true);
-              }}
-            >
-              <option value="">请选择学年</option>
-              {Array.from(
-                { length: 5 },
-                (_, i) => new Date().getFullYear() - 2 + i
-              ).map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="field">
-            <label>学期类型：</label>
-            <select
-              value={semesterType}
-              name="semesterType"
-              onChange={(e) => {
-                setSemesterType(e.target.value);
-                setDirty(true);
-              }}
-            >
-              <option value="">请选择学期</option>
-              <option value="1">秋季学期</option>
-              <option value="2">春季学期</option>
-            </select>
-          </div>
-
-          <div className="field">
-            <label>班次名称：</label>
-            <div className="generated-value">
-              <span>{generatedValues.name}</span>
-              <input type="hidden" name="name" value={generatedValues.name} />
-            </div>
-          </div>
-
-          <div className="field">
-            <label>班次号：</label>
-            <div className="generated-value">
-              <span>{generatedValues.class_no}</span>
-              <input
-                type="hidden"
-                name="class_no"
-                value={generatedValues.class_no}
-              />
-            </div>
-          </div>
-
-          <div className="field">
-            <label>学期：</label>
-            <div className="generated-value">
-              <span>{generatedValues.semester}</span>
-              <input
-                type="hidden"
-                name="semester"
-                value={generatedValues.semester}
-              />
-            </div>
-          </div>
-
-          <div className="field">
-            <label>地点：</label>
-            <input
-              type="text"
-              name="location"
-              defaultValue={classinfo?.location || ""}
-              onChange={checkChange}
-            />
-          </div>
-        </form>
+      {/* 头部显示班次信息 */}
+      <div className="paper-head">
+        <h2>{isNew ? "新建班次" : `班次详情：${classinfo.name}`}</h2>
       </div>
 
-      {/* 操作按钮 */}
-      <div className="paper-footer">
-        <div className="btns">
-          <button className="btn" onClick={deleteAction} disabled={isBusy}>
-            删除
-          </button>
+      {/* 新增选项卡导航 */}
+      <div className="tabs">
+        <button
+          className={`tab ${activeTab === "basic" ? "active" : ""}`}
+          onClick={() => setActiveTab("basic")}
+        >
+          基本信息
+        </button>
+        {!isNew && (
           <button
-            className="btn"
-            onClick={saveAction}
-            disabled={isBusy || !isDirty}
+            className={`tab ${activeTab === "students" ? "active" : ""}`}
+            onClick={() => setActiveTab("students")}
           >
-            保存
+            学生管理
           </button>
-          <button
-            className="btn"
-            onClick={() => {
-              navigate("/class/list");
-            }}
-          >
-            返回
-          </button>
-        </div>
+        )}
       </div>
+
+      {/* 选项卡内容 */}
+      {activeTab === "basic" ? (
+        <>
+          <div className="paper-body">
+            <form ref={formRef} onChange={checkChange}>
+              <div className="field">
+                <label>关联课程：</label>
+                <select
+                  name="cou_sn"
+                  value={selectedCouSn || ""} // 添加value属性
+                  onChange={(e) => {
+                    setSelectedCouSn(e.target.value); // 更新选择的课程SN
+                    setDirty(true);
+                  }}
+                >
+                  <option value="">请选择课程</option>
+                  {courses.map((course) => (
+                    <option key={course.course_sn} value={course.course_sn}>
+                      {course.course_name} ({course.course_no})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="field">
+                <label>起始学年：</label>
+                <select
+                  value={year}
+                  name="year"
+                  onChange={(e) => {
+                    setYear(e.target.value);
+                    setDirty(true);
+                  }}
+                >
+                  <option value="">请选择学年</option>
+                  {Array.from(
+                    { length: 5 },
+                    (_, i) => new Date().getFullYear() - 2 + i
+                  ).map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="field">
+                <label>学期类型：</label>
+                <select
+                  value={semesterType}
+                  name="semesterType"
+                  onChange={(e) => {
+                    setSemesterType(e.target.value);
+                    setDirty(true);
+                  }}
+                >
+                  <option value="">请选择学期</option>
+                  <option value="1">秋季学期</option>
+                  <option value="2">春季学期</option>
+                </select>
+              </div>
+
+              <div className="field">
+                <label>班次名称：</label>
+                <div className="generated-value">
+                  <span>{generatedValues.name}</span>
+                  <input
+                    type="hidden"
+                    name="name"
+                    value={generatedValues.name}
+                  />
+                </div>
+              </div>
+
+              <div className="field">
+                <label>班次号：</label>
+                <div className="generated-value">
+                  <span>{generatedValues.class_no}</span>
+                  <input
+                    type="hidden"
+                    name="class_no"
+                    value={generatedValues.class_no}
+                  />
+                </div>
+              </div>
+
+              <div className="field">
+                <label>学期：</label>
+                <div className="generated-value">
+                  <span>{generatedValues.semester}</span>
+                  <input
+                    type="hidden"
+                    name="semester"
+                    value={generatedValues.semester}
+                  />
+                </div>
+              </div>
+
+              <div className="field">
+                <label>地点：</label>
+                <input
+                  type="text"
+                  name="location"
+                  defaultValue={classinfo?.location || ""}
+                  onChange={checkChange}
+                />
+              </div>
+            </form>
+          </div>
+
+          <div className="paper-footer">
+            <div className="btns">
+              <button className="btn" onClick={deleteAction} disabled={isBusy}>
+                删除
+              </button>
+              <button
+                className="btn"
+                onClick={saveAction}
+                disabled={isBusy || !isDirty}
+              >
+                保存
+              </button>
+              <button
+                className="btn"
+                onClick={() => {
+                  navigate("/class/list");
+                }}
+              >
+                返回
+              </button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="paper-body">
+            <ClassStudentSelection classinfo={classinfo} />
+          </div>
+          <div className="paper-footer">
+            <div className="btns">
+              <button
+                className="btn"
+                onClick={() => {
+                  navigate("/class/list");
+                }}
+              >
+                返回
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
       <div className="statusbar">
         {isBusy && <div className="message">处理中，请稍后...</div>}
         {actionError && (
