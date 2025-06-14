@@ -5,6 +5,7 @@ import { fetcher } from "../utils";
 import { SearchBar } from "@components/SearchBar";
 import { Pagination } from "@components/Pagination";
 import "./student-selection.css";
+import { message } from "antd";
 
 export default function ClassStudentSelection({ classinfo }) {
   useEffect(() => {
@@ -17,6 +18,7 @@ export default function ClassStudentSelection({ classinfo }) {
   const [selectedStudents, setSelectedStudents] = useState(new Map()); // 选中学生状态（改进点2：使用Map存储附加信息）
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState(""); // 搜索过滤状态
+  const [hasChanges, setHasChanges] = useState(false); // 是否修改状态
 
   // 2. 安全获取学生数据：分页获取所有学生
   const studentFetcher = async (url) => {
@@ -114,22 +116,42 @@ export default function ClassStudentSelection({ classinfo }) {
     console.log("SWR触发条件变化:", classinfo?.class_sn);
   }, [classinfo?.class_sn]);
 
-  // 5. 安全的初始化逻辑:初始化已选学生（改进点3：存储完整学生信息）
+  // 5. 初始化已选学生
   useEffect(() => {
     console.log("Linked Students:", linkedStudents); // 添加调试日志
     if (linkedStudents.length > 0 && allStudents.length > 0) {
+      console.log("初始化选中状态", { linkedStudents, allStudents });
       const initialMap = new Map();
-      linkedStudents.forEach((linkedStudent) => {
+      linkedStudents.forEach((linked) => {
+        // 精确匹配学生（确保sn和no都匹配）
         const fullStudent = allStudents.find(
-          (s) => s?.stu_sn === linkedStudent?.stu_sn
+          (s) => s?.stu_sn === linked?.stu_sn && s?.stu_no === linked?.stu_no
         );
         if (fullStudent) {
-          initialMap.set(linkedStudent.stu_sn, fullStudent);
+          initialMap.set(linked.stu_sn, fullStudent);
+        } else {
+          console.warn("未找到匹配的完整学生信息", linked);
         }
       });
       setSelectedStudents(initialMap);
+      setHasChanges(false); // 初始化时无修改
+      console.log("初始化后的selectedStudents", Array.from(initialMap.keys()));
     }
   }, [linkedStudents, allStudents]);
+
+  // 监听选中变化
+  useEffect(() => {
+    if (linkedStudents?.length > 0) {
+      const currentSelected = Array.from(selectedStudents.keys());
+      const originalSelected = linkedStudents.map((s) => s.stu_sn);
+
+      const isChanged =
+        currentSelected.length !== originalSelected.length ||
+        !currentSelected.every((sn) => originalSelected.includes(sn));
+
+      setHasChanges(isChanged);
+    }
+  }, [selectedStudents, linkedStudents]);
 
   // 处理勾选变化（改进点5：批量操作支持）
   const handleCheck = (student, isBatch = false) => {
@@ -157,31 +179,59 @@ export default function ClassStudentSelection({ classinfo }) {
 
   // 提交关联（改进点6：分批提交）（添加缓存失效机制）
   const handleSubmit = async () => {
+    if (!hasChanges) {
+      message.warning("未检测到修改内容");
+      return;
+    }
     try {
       setIsSubmitting(true); // 开始提交
       const batchSize = 50; // 每批50个学生
-      const studentArray = Array.from(selectedStudents.keys());
+      const student_sns = Array.from(selectedStudents.keys());
 
-      // 1. 执行POST请求并获取响应
-      const { added_count, students } = await fetcher(
+      // 1. 执行PUT请求并获取响应
+      const response = await fetcher(
         `/api/class/${classinfo.class_sn}/students`,
         {
-          method: "POST",
+          method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ student_sns: studentArray }),
+          body: JSON.stringify({ student_sns: student_sns }),
         }
       );
 
       // 2. 更新SWR缓存
-      mutate(`/api/class/${classinfo.class_sn}/students`, students, false);
-
-      alert(`成功关联 ${added_count} 名学生`);
-
+      if (response.conflicts && response.conflicts.length > 0) {
+        const conflictList = response.conflicts
+          .map((s) => `${s.stu_name}(${s.stu_no}) - 已关联: ${s.class_no}`)
+          .join("\n");
+        message.error(`无法关联以下学生:\n${conflictList}`);
+        await mutate(); // 刷新数据
+      } else {
+        message.success(
+          `更新成功！\n新增: ${response.added.length}人\n` +
+            `移除: ${response.removed.length}人\n` +
+            `当前关联: ${response.total_count}人`
+        );
+        await mutate(
+          `/api/class/${classinfo.class_sn}/students`,
+          response.students,
+          false
+        );
+      }
       // 3. 清空选中状态（根据需求可选）
-      setSelectedStudents(new Map());
+      setSelectedStudents(
+        new Map(response.students?.map((s) => [s.stu_sn, s]) || [])
+      );
     } catch (err) {
-      console.error("关联失败详情:", err);
-      alert(`关联失败: ${err.message || "未知错误"}`);
+      if (err.info?.detail?.message === "部分学生已关联到本课程的其他班次") {
+        const conflictNames = err.info.detail.conflicts
+          .map((s) => `${s.stu_name}(${s.stu_no}) - 已关联班次: ${s.class_no}`)
+          .join("\n");
+        message.error(
+          `无法关联以下学生:\n${conflictNames}\n\n一个学生只能关联到同一课程的一个班次`
+        );
+      } else {
+        message.error(`关联失败: ${err.message || "未知错误"}`);
+      }
     } finally {
       setIsSubmitting(false); // 结束提交
     }
@@ -209,7 +259,7 @@ export default function ClassStudentSelection({ classinfo }) {
           <span>已选: {selectedStudents.size}人</span>
           <button
             onClick={handleSubmit}
-            disabled={selectedStudents.size === 0 || isSubmitting}
+            disabled={!hasChanges || isSubmitting} // 无修改时禁用
           >
             {isSubmitting ? "提交中..." : "保存关联"}
           </button>

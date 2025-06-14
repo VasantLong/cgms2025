@@ -96,6 +96,12 @@ ALTER TABLE class_student
 ALTER TABLE class_student 
   ADD CONSTRAINT uniq_class_student 
     UNIQUE (class_sn, stu_sn);
+ALTER TABLE class_student
+  ADD CONSTRAINT unique_student_course 
+    UNIQUE (stu_sn, 
+    (SELECT cou_sn 
+    FROM class 
+    WHERE class.sn = class_student.class_sn));
 
 -- === 成绩表
 DROP TABLE IF EXISTS class_grade;
@@ -154,3 +160,24 @@ CREATE INDEX idx_grade_stu_class ON class_grade(stu_sn, class_sn);
 -- 加速课程关联查询
 CREATE INDEX idx_class_course ON class 
     USING BTREE (sn, cou_sn);
+
+-- === 确保一个学生只能关联到同一课程的一个班次
+-- 添加辅助列并创建函数索引
+ALTER TABLE class_student ADD COLUMN cou_sn INTEGER;
+
+-- 通过触发器或更新语句维护这个列
+CREATE OR REPLACE FUNCTION set_class_cou_sn()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.cou_sn := (SELECT cou_sn FROM class WHERE sn = NEW.class_sn);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_set_cou_sn
+BEFORE INSERT OR UPDATE ON class_student
+FOR EACH ROW EXECUTE FUNCTION set_class_cou_sn();
+
+-- 创建唯一索引
+CREATE UNIQUE INDEX idx_student_course_unique 
+ON class_student (stu_sn, cou_sn);
