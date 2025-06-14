@@ -448,9 +448,23 @@ function ClassDetail({ classinfo }) {
           </div>
         </>
       ) : (
-        <div className="paper-body">
-          <ClassStudentSelection classinfo={classinfo} />
-        </div>
+        <>
+          <div className="paper-body">
+            <ClassStudentSelection classinfo={classinfo} />
+          </div>
+          <div className="paper-footer">
+            <div className="btns">
+              <button
+                className="btn"
+                onClick={() => {
+                  navigate("/class/list");
+                }}
+              >
+                返回
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
       <div className="statusbar">

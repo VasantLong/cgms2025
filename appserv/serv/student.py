@@ -33,13 +33,30 @@ class Student(BaseModel):
  #   page: int = Query(1, ge=1),
   #  page_size: int = Query(20, ge=1, le=100
 @router.get("/api/student/list")
-async def get_student_list() -> list[Student]:
+async def get_student_list(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    last_sn: int = Query(None)  # 新增参数
+) -> list[Student]:
     with dblock() as db:
-        db.execute("""
+        query = """
         SELECT sn AS stu_sn, no AS stu_no, name AS stu_name, gender, enrollment_date 
         FROM student
-        ORDER BY no, name
-        """)
+        """
+        params = {}
+
+        # 添加游标分页条件
+        if last_sn:
+            query += " WHERE sn > %(last_sn)s"
+            params["last_sn"] = last_sn
+        # 没有游标时使用传统分页
+        else:
+            params["offset"] = (page - 1) * page_size
+
+        query += " ORDER BY sn LIMIT %(limit)s"
+        params["limit"] = page_size
+        
+        db.execute(query, params)
         data = [Student(**asdict(row)) for row in db]
 
     return data

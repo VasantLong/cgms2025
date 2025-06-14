@@ -20,11 +20,8 @@ export default function ClassStudentSelection({ classinfo }) {
 
   // 2. 安全获取学生数据：分页获取所有学生
   const studentFetcher = async (url) => {
-    const res = await fetcher(url);
-    // 处理两种API响应结构
-    if (Array.isArray(res)) return res; // 对于直接返回数组的API
-    if (res?.data) return res.data; // 对于分页结构的API
-    return [];
+    const res = await fetcher(url + `&last_sn=${lastLoadedSn}`); // 需要后端支持
+    return Array.isArray(res) ? res : res?.data || [];
   };
   const { data, size, setSize, isValidating, error } = useSWRInfinite(
     (index) => `/api/student/list?page=${index + 1}&page_size=20`,
@@ -69,9 +66,19 @@ export default function ClassStudentSelection({ classinfo }) {
   // 4. 处理数据格式
   const allStudents = useMemo(() => {
     if (!data) return [];
-    // 根据实际API响应结构调整
-    // 因为/api/student/list返回的是完整数组，不是分页结构
-    return data ? data.flat() : [];
+    // 合并所有页数据并去重
+    const merged = data.flat();
+    const uniqueStudents = [];
+    const seen = new Set();
+
+    merged.forEach((student) => {
+      if (student?.stu_sn && !seen.has(student.stu_sn)) {
+        seen.add(student.stu_sn);
+        uniqueStudents.push(student);
+      }
+    });
+
+    return uniqueStudents;
   }, [data]);
 
   const linkedStudents = useMemo(() => {
@@ -238,7 +245,8 @@ export default function ClassStudentSelection({ classinfo }) {
               </tr>
             )}
             {filteredStudents.map((student) => (
-              <tr key={student.stu_sn}>
+              <tr key={`${student.stu_sn}-${student.stu_no}`}>
+                {/* 使用复合key */}
                 <td>
                   <input
                     type="checkbox"
@@ -265,6 +273,7 @@ export default function ClassStudentSelection({ classinfo }) {
       {/* 分页加载更多（改进点9） */}
       <Pagination
         isLoading={isValidating}
+        hasMore={data?.[data.length - 1]?.length === 20} // 假设每页20条
         onLoadMore={() => setSize(size + 1)}
       />
 
