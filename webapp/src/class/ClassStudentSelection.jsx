@@ -19,6 +19,9 @@ export default function ClassStudentSelection({ classinfo }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState(""); // 搜索过滤状态
   const [hasChanges, setHasChanges] = useState(false); // 是否修改状态
+  const [conflictStudents, setConflictStudents] = useState(new Set()); // 存储冲突学生的stu_sn
+  const [initialSelected, setInitialSelected] = useState(new Set());
+  const [lastSubmitted, setLastSubmitted] = useState(new Set());
 
   // 2. 安全获取学生数据：分页获取所有学生
   const studentFetcher = async (url) => {
@@ -92,6 +95,7 @@ export default function ClassStudentSelection({ classinfo }) {
       ? linkedResponse
       : [];
   }, [linkedResponse]);
+
   // 过滤学生列表（改进点4）
   const filteredStudents = useMemo(() => {
     if (!Array.isArray(allStudents)) return [];
@@ -105,6 +109,7 @@ export default function ClassStudentSelection({ classinfo }) {
   }, [allStudents, searchTerm]);
 
   useEffect(() => {
+    //调试
     console.log("Current data state:", {
       allStudents,
       linkedStudents,
@@ -113,15 +118,44 @@ export default function ClassStudentSelection({ classinfo }) {
   }, [allStudents, linkedStudents, selectedStudents]);
 
   useEffect(() => {
+    //调试
     console.log("SWR触发条件变化:", classinfo?.class_sn);
   }, [classinfo?.class_sn]);
 
+  // 替换原来的可用学生获取逻辑
+  const availableStudents = useMemo(() => {
+    const linkedSnSet = new Set(linkedStudents.map((s) => s.stu_sn));
+    return allStudents.filter((s) => !linkedSnSet.has(s.stu_sn));
+  }, [allStudents, linkedStudents]);
+
+  // 处理冲突学生
+  const checkConflicts = async (studentSns) => {
+    if (!classinfo?.class_sn || studentSns.length === 0) return;
+
+    try {
+      // 将数组转换为多个student_sns参数
+      const params = new URLSearchParams();
+      studentSns.forEach((sn) => params.append("student_sns", sn));
+      const conflicts = await fetcher(
+        `/api/class/${
+          classinfo.class_sn
+        }/students/conflicts?${params.toString()}`
+      );
+      // 提取冲突学生的stu_sn并存入Set
+      const conflictSnSet = new Set(conflicts.map((s) => s.stu_sn));
+      setConflictStudents(conflictSnSet);
+    } catch (err) {
+      console.error("检查冲突失败:", err);
+      message.error("检查学生冲突时出错");
+    }
+  };
+
   // 5. 初始化已选学生
   useEffect(() => {
-    console.log("Linked Students:", linkedStudents); // 添加调试日志
     if (linkedStudents.length > 0 && allStudents.length > 0) {
       console.log("初始化选中状态", { linkedStudents, allStudents });
       const initialMap = new Map();
+      const initialSnSet = new Set();
       linkedStudents.forEach((linked) => {
         // 精确匹配学生（确保sn和no都匹配）
         const fullStudent = allStudents.find(
@@ -129,29 +163,37 @@ export default function ClassStudentSelection({ classinfo }) {
         );
         if (fullStudent) {
           initialMap.set(linked.stu_sn, fullStudent);
+          initialSnSet.add(linked.stu_sn);
         } else {
           console.warn("未找到匹配的完整学生信息", linked);
         }
       });
       setSelectedStudents(initialMap);
+      setInitialSelected(initialSnSet);
+      setLastSubmitted(new Set(initialSnSet));
       setHasChanges(false); // 初始化时无修改
       console.log("初始化后的selectedStudents", Array.from(initialMap.keys()));
     }
   }, [linkedStudents, allStudents]);
 
+  // 冲突学生
+  useEffect(() => {
+    if (allStudents.length > 0 && classinfo?.class_sn) {
+      const studentSns = allStudents.map((s) => s.stu_sn);
+      checkConflicts(studentSns);
+    }
+  }, [allStudents, classinfo?.class_sn]);
+
   // 监听选中变化
   useEffect(() => {
-    if (linkedStudents?.length > 0) {
-      const currentSelected = Array.from(selectedStudents.keys());
-      const originalSelected = linkedStudents.map((s) => s.stu_sn);
+    const currentSelected = new Set(selectedStudents.keys());
+    const isChanged =
+      currentSelected.size !== initialSelected.size ||
+      Array.from(currentSelected).some((sn) => !initialSelected.has(sn)) ||
+      Array.from(initialSelected).some((sn) => !currentSelected.has(sn));
 
-      const isChanged =
-        currentSelected.length !== originalSelected.length ||
-        !currentSelected.every((sn) => originalSelected.includes(sn));
-
-      setHasChanges(isChanged);
-    }
-  }, [selectedStudents, linkedStudents]);
+    setHasChanges(isChanged);
+  }, [selectedStudents, initialSelected]);
 
   // 处理勾选变化（改进点5：批量操作支持）
   const handleCheck = (student, isBatch = false) => {
@@ -170,6 +212,7 @@ export default function ClassStudentSelection({ classinfo }) {
   const handleBatchSelect = (selectAll) => {
     const newMap = new Map(selectedStudents);
     filteredStudents.forEach((student) => {
+      if (conflictStudents.has(student.stu_sn)) return;
       selectAll
         ? newMap.set(student.stu_sn, student)
         : newMap.delete(student.stu_sn);
@@ -183,6 +226,17 @@ export default function ClassStudentSelection({ classinfo }) {
       message.warning("未检测到修改内容");
       return;
     }
+
+    // 检查是否有选中的冲突学生
+    const selectedConflictStudents = Array.from(selectedStudents.keys()).filter(
+      (sn) => conflictStudents.has(sn)
+    );
+
+    if (selectedConflictStudents.length > 0) {
+      message.error("不能提交包含冲突学生的选择");
+      return;
+    }
+
     try {
       setIsSubmitting(true); // 开始提交
       const batchSize = 50; // 每批50个学生
@@ -198,6 +252,14 @@ export default function ClassStudentSelection({ classinfo }) {
         }
       );
 
+      const currentSelected = new Set(selectedStudents.keys());
+      const added = Array.from(currentSelected).filter(
+        (sn) => !lastSubmitted.has(sn)
+      );
+      const removed = Array.from(lastSubmitted).filter(
+        (sn) => !currentSelected.has(sn)
+      );
+
       // 2. 更新SWR缓存
       if (response.conflicts && response.conflicts.length > 0) {
         const conflictList = response.conflicts
@@ -211,6 +273,7 @@ export default function ClassStudentSelection({ classinfo }) {
             `移除: ${response.removed.length}人\n` +
             `当前关联: ${response.total_count}人`
         );
+        setLastSubmitted(new Set(selectedStudents.keys()));
         await mutate(
           `/api/class/${classinfo.class_sn}/students`,
           response.students,
@@ -274,9 +337,14 @@ export default function ClassStudentSelection({ classinfo }) {
               <th width="50px">
                 <input
                   type="checkbox"
-                  checked={filteredStudents.every((s) =>
-                    selectedStudents.has(s.stu_sn)
-                  )}
+                  checked={
+                    filteredStudents.length > 0 &&
+                    filteredStudents.every(
+                      (s) =>
+                        selectedStudents.has(s.stu_sn) ||
+                        conflictStudents.has(s.stu_sn)
+                    )
+                  }
                   onChange={(e) => handleBatchSelect(e.target.checked)}
                 />
               </th>
@@ -294,28 +362,51 @@ export default function ClassStudentSelection({ classinfo }) {
                 </td>
               </tr>
             )}
-            {filteredStudents.map((student) => (
-              <tr key={`${student.stu_sn}-${student.stu_no}`}>
-                {/* 使用复合key */}
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={selectedStudents.has(student.stu_sn)}
-                    onChange={() => handleCheck(student)}
-                  />
-                </td>
-                <td>{student.stu_no}</td>
-                <td>{student.stu_name}</td>
-                <td>{student.gender === "M" ? "男" : "女"}</td>
-                <td>
-                  {isSubmitting && selectedStudents.has(student.stu_sn)
-                    ? "保存中..."
-                    : linkedStudents.some((s) => s.stu_sn === student.stu_sn)
-                    ? "✓ 已关联"
-                    : "未关联"}
-                </td>
-              </tr>
-            ))}
+            {filteredStudents.map((student) => {
+              const isConflict = conflictStudents.has(student.stu_sn);
+              const isLinked = linkedStudents.some(
+                (s) => s.stu_sn === student.stu_sn
+              );
+              const isSelected = selectedStudents.has(student.stu_sn);
+
+              return (
+                <tr
+                  key={`${student.stu_sn}-${student.stu_no}`}
+                  /* 使用复合key */
+                  className={isConflict ? "conflict-row" : ""}
+                >
+                  <td>
+                    {isConflict ? (
+                      <span
+                        className="conflict-tooltip"
+                        title="该学生已关联本课程的其他班次"
+                      >
+                        ⚠️
+                      </span>
+                    ) : (
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => !isConflict && handleCheck(student)}
+                        disabled={isConflict}
+                      />
+                    )}
+                  </td>
+                  <td>{student.stu_no}</td>
+                  <td>{student.stu_name}</td>
+                  <td>{student.gender === "M" ? "男" : "女"}</td>
+                  <td>
+                    {isSubmitting && isSelected
+                      ? "保存中..."
+                      : isLinked
+                      ? "✓ 已关联"
+                      : isConflict
+                      ? "冲突（不可选）"
+                      : "未关联"}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

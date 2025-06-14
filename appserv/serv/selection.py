@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel, Field
 from typing import List
 import datetime as dt
@@ -54,31 +54,47 @@ async def get_class_students(
     with dblock() as db:
         return await get_current_students(db, class_sn)
 
-
-@router.get("/api/class/{class_sn}/students/available",
-           summary="获取可选学生列表")
-async def get_available_students(
+@router.get("/api/class/{class_sn}/students/conflicts", 
+           summary="检查学生冲突")
+async def check_student_conflicts(
     class_sn: int,
+    student_sns: List[int] = Query(...),
     current_user: User = Depends(get_current_active_user)
 ):
+    """检查学生是否在其他班次有冲突"""
     validate_jiaomi_role(current_user.user_name)
     with dblock() as db:
+        db.execute("""
+            SELECT c.cou_sn 
+            FROM class AS c 
+            WHERE c.sn = %(class_sn)s
+            """, 
+            {"class_sn": class_sn}
+        )
+        class_info = db.fetchone()
+        if not class_info:
+            raise HTTPException(404, "班次不存在")
+        
         db.execute("""
             SELECT s.sn AS stu_sn, 
                    s.no AS stu_no, 
                    s.name AS stu_name, 
-                   s.gender, 
-                   s.enrollment_date
+                   c.class_no AS class_no
             FROM student AS s
-            WHERE s.sn NOT IN (
-                SELECT stu_sn FROM class_student
-                WHERE class_sn = %(class_sn)s
-            )
-            ORDER BY s.no
+            JOIN class_student AS cs ON s.sn = cs.stu_sn
+            JOIN class AS c ON cs.class_sn = c.sn
+            WHERE s.sn = ANY(%(sns)s) 
+            AND c.cou_sn = %(cou_sn)s
+            AND c.sn != %(class_sn)s
             """, 
-            {"class_sn": class_sn}
+            {
+                "sns": student_sns,
+                "cou_sn": class_info.cou_sn,
+                "class_sn": class_sn
+            }
         )
         return [asdict(row) for row in db]
+
 
 @router.put("/api/class/{class_sn}/students",
             response_model=ClassStudentsResponse,

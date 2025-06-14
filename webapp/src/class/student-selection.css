@@ -49,3 +49,18 @@
   text-align: center;
   color: #1890ff;
 }
+
+.conflict-tooltip {
+  margin-left: 4px;
+  color: #ff4d4f;
+  cursor: help;
+}
+
+input[type="checkbox"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.conflict-row {
+  background-color: #fff2f0;
+}
