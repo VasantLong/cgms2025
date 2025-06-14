@@ -7,9 +7,6 @@ function ClassNew(props) {
 
   return (
     <div className="paper">
-      <div className="paper-head">
-        <h3>新建班次</h3>
-      </div>
       <ClassDetail classinfo={classinfo} />
     </div>
   );

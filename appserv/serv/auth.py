@@ -4,6 +4,9 @@ from typing import Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.redis import RedisBackend  # 需要安装redis依赖
+from fastapi_cache.decorator import cache
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, field_validator
@@ -103,19 +106,35 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(o
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    # 生成缓存键
+    cache_key = f"user:{token}"
     try:
+        # 尝试从缓存获取
+        cached_user = await FastAPICache.get_backend().get(cache_key)
+        if cached_user:
+            return User(**cached_user)
+        
+        # 缓存未命中，从数据库获取
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("username") # type: ignore
         if not username:
             raise credentials_exception
+        
+        # 获取用户并缓存
+        user = await get_user(username)
+        if user is None:
+            raise credentials_exception   
+        
+        # 缓存用户信息（有效期5分钟）
+        await FastAPICache.get_backend().set(cache_key, user.model_dump(), expire=300)
+        
+        return user         
+    
     except JWTError as e:
         raise credentials_exception from e
     
-    user = await get_user(username)
-    if user is None:
-        raise credentials_exception
-    
-    return user
+
 
 async def get_current_active_user(current_user: User = Depends(get_current_user)):
     return current_user

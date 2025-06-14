@@ -1,6 +1,6 @@
 import asyncio  # noqa: F401
 from dataclasses import asdict
-from fastapi import status
+from fastapi import status, Query
 import datetime as dt
 from fastapi import HTTPException, APIRouter
 
@@ -29,7 +29,9 @@ class Student(BaseModel):
             raise ValueError("入学日期必须在2000年1月1日之后")
         return v
 
-
+# 分页到时候再说
+ #   page: int = Query(1, ge=1),
+  #  page_size: int = Query(20, ge=1, le=100
 @router.get("/api/student/list")
 async def get_student_list() -> list[Student]:
     with dblock() as db:
