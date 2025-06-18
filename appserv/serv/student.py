@@ -100,7 +100,11 @@ async def new_student(student: Student) -> Student:
                 f"学号'{stu_no}'已被{record.stu_name}(#{record.stu_sn}占用"
             )
 
-        # with dblock() as db:  # 思考：为什么此处不能另起一个连接或事务
+        # 思考：为什么此处不能另起一个连接或事务（ACID）
+        # 必须保持与前面 SELECT 在同一个事务中：
+        # 1. 避免竞态条件：如果另起事务，其他连接可能在检查后插入相同学号
+        # 2. 保证原子性：整个操作要么全部成功要么全部失败
+        # 3. 共享事务隔离级别：确保看到一致的数据视图
         db.execute(
             """
             INSERT INTO student (no, name, gender, enrollment_date)

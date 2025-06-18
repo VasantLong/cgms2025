@@ -1,15 +1,16 @@
-import { Table, InputNumber, Button, message, Modal } from "antd";
+import { Table, InputNumber, Button, message, Modal, Alert } from "antd";
 import { useState, useEffect } from "react";
 import { fetcher } from "../utils";
 import "./grade-entry.css";
+import * as XLSX from "xlsx";
 
 export default function GradeInputSection({ classinfo }) {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   // 新增状态和函数
-  const [importVisible, setImportVisible] = useState(false);
   const [importData, setImportData] = useState([]);
+  const [importVisible, setImportVisible] = useState(false);
   const [importStats, setImportStats] = useState(null);
 
   // 加载班次学生数据及已有成绩
@@ -65,7 +66,7 @@ export default function GradeInputSection({ classinfo }) {
         return;
       }
 
-      const result = await fetcher("api/grade/batch", {
+      const result = await fetcher("/api/grade/batch", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -109,16 +110,37 @@ export default function GradeInputSection({ classinfo }) {
           const sheet = workbook.Sheets[workbook.SheetNames[0]];
           const jsonData = XLSX.utils.sheet_to_json(sheet);
 
+          // 转换字段名为英文
+          const mappedData = jsonData.map((item, index) => {
+            // 新增成绩验证
+            const gradeValue = item["成绩"];
+            const isValidGrade =
+              typeof gradeValue === "number" &&
+              gradeValue >= 0 &&
+              gradeValue <= 100;
+
+            return {
+              stu_no: item["学号"],
+              name: item["姓名"],
+              grade: isValidGrade ? gradeValue : null,
+              remark: item["备注"] || "",
+              // 新增错误标记
+              _error: isValidGrade
+                ? null
+                : `第 ${index + 2} 行成绩无效（${gradeValue}）`,
+            };
+          });
+
           // 验证必要字段
           if (
-            !jsonData.every(
-              (item) => "学号" in item && "姓名" in item && "成绩" in item
+            !mappedData.every(
+              (item) => "stu_no" in item && "name" in item && "grade" in item
             )
           ) {
             throw new Error("Excel缺少必要列(学号/姓名/成绩)");
           }
 
-          resolve(jsonData);
+          resolve(mappedData);
         } catch (error) {
           reject(error);
         }
@@ -127,35 +149,78 @@ export default function GradeInputSection({ classinfo }) {
     });
   };
 
+  // 修改文件上传处理，获取文件名
+  const handleFileUpload = async (e) => {
+    if (e.target.files[0]) {
+      try {
+        const file = e.target.files[0];
+
+        // 新验证逻辑：匹配班次编号和模板名称
+        const expectedPattern = new RegExp(
+          `${classinfo.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\(${
+            classinfo.class_no
+          }\\)成绩导入模板.*\\.xlsx`,
+          "i" // 忽略大小写
+        );
+
+        if (!expectedPattern.test(file.name)) {
+          message.error(
+            `请使用模板文件: ${classinfo.name}(${classinfo.class_no})成绩导入模板.xlsx`
+          );
+          e.target.value = "";
+          return;
+        }
+
+        // 通过验证后再解析文件
+        const data = await parseExcel(file);
+        setImportData({
+          data,
+          fileName: file.name, // 新增文件名存储
+        });
+        setImportVisible(true);
+      } catch (error) {
+        message.error(`文件解析错误: ${error.message}`);
+      }
+      e.target.value = "";
+    }
+  };
+
   // 导入确认
   const handleImportConfirm = async () => {
     try {
-      const result = await fetcher("api/grade/import", {
+      const result = await fetcher("/api/grade/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           class_sn: classinfo.class_sn,
-          records: importData,
+          records: importData.data.map((item) => ({
+            stu_no: item.stu_no, // 保持英文字段名
+            name: item.name,
+            grade: item.grade,
+            remark: item.remark || "",
+          })),
         }),
       });
 
-      setImportStats(result.stats);
+      setImportStats(result.stats); // 先更新统计信息
+
       if (result.stats.failed === 0) {
         message.success(`成功导入 ${result.stats.success} 条记录`);
         setStudents((prev) =>
           prev.map((s) => {
-            const imported = importData.find((i) => i.stu_no === s.stu_no);
-            return imported ? { ...s, grade: imported.成绩 } : s;
+            const imported = importData.data.find((i) => i.stu_no === s.stu_no);
+            return imported ? { ...s, grade: imported.grade } : s;
           })
         );
+        handleCloseImportModal(); // 成功时关闭弹窗
       } else {
         message.warning(
           `导入完成，成功 ${result.stats.success} 条，失败 ${result.stats.failed} 条`
         );
       }
-      setImportVisible(false);
     } catch (error) {
       message.error(`导入失败: ${error.info?.detail || error.message}`);
+      handleCloseImportModal();
     }
   };
 
@@ -195,6 +260,13 @@ export default function GradeInputSection({ classinfo }) {
     },
   ];
 
+  // 新增弹窗关闭处理函数
+  const handleCloseImportModal = () => {
+    setImportVisible(false);
+    setImportStats(null); // 重置统计信息
+    setImportData({ data: [], fileName: "" }); // 清空导入数据
+  };
+
   return (
     <div className="grade-entry-container">
       <div className="grade-toolbar">
@@ -216,7 +288,7 @@ export default function GradeInputSection({ classinfo }) {
           </Button>
         </div>
         <div className="grade-count">
-          <span>班级: {classinfo.class_no} | </span>
+          <span>班次: {classinfo.class_no} | </span>
           <span>学生总数: {students.length} | </span>
           <span>已录入: {students.filter((s) => s.grade !== null).length}</span>
         </div>
@@ -228,26 +300,17 @@ export default function GradeInputSection({ classinfo }) {
         id="excel-upload"
         accept=".xlsx,.xls"
         style={{ display: "none" }}
-        onChange={async (e) => {
-          if (e.target.files[0]) {
-            try {
-              const data = await parseExcel(e.target.files[0]);
-              setImportData(data);
-              setImportVisible(true);
-            } catch (error) {
-              message.error(`文件解析错误: ${error.message}`);
-            }
-            e.target.value = ""; // 重置input
-          }
-        }}
+        onChange={handleFileUpload}
       />
 
       {/* 导入确认对话框 */}
       <Modal
         title="导入确认"
         open={importVisible}
-        onOk={handleImportConfirm}
-        onCancel={() => setImportVisible(false)}
+        onOk={async () => {
+          await handleImportConfirm(); // 等待导入操作完成
+        }}
+        onCancel={handleCloseImportModal}
         okText="确认导入"
         cancelText="取消"
         width={800}
@@ -255,38 +318,37 @@ export default function GradeInputSection({ classinfo }) {
         <div className="import-preview">
           <Table
             columns={[
-              { title: "学号", dataIndex: "学号", key: "no" },
-              { title: "姓名", dataIndex: "姓名", key: "name" },
+              { title: "学号", dataIndex: "stu_no", key: "stu_no" },
+              { title: "姓名", dataIndex: "name", key: "name" },
               {
                 title: "成绩",
-                dataIndex: "成绩",
+                dataIndex: "grade",
                 key: "grade",
-                render: (value) => (
+                render: (value, record) => (
                   <span
                     style={{
-                      color:
-                        value === undefined
-                          ? "red"
-                          : value < 0 || value > 100
-                          ? "orange"
-                          : "green",
+                      color: record._error
+                        ? "red"
+                        : value < 0 || value > 100
+                        ? "orange"
+                        : "green",
                     }}
                   >
-                    {value ?? "空值"}
+                    {record._error || (value ?? "空值")}
                   </span>
                 ),
               },
-              { title: "备注", dataIndex: "备注", key: "remark" },
+              { title: "备注", dataIndex: "remark", key: "remark" },
             ]}
-            dataSource={importData}
+            dataSource={importData.data}
             pagination={{ pageSize: 5 }}
-            rowKey="学号"
+            rowKey="stu_no"
           />
           {importStats && (
             <div className="import-stats">
               <Alert
-                message={`验证结果: 有效 ${importStats.valid} 条，无效 ${importStats.invalid} 条`}
-                type={importStats.invalid === 0 ? "success" : "warning"}
+                message={`验证结果: 成功 ${importStats.success} 条，失败 ${importStats.failed} 条，无效 ${importStats.invalid} 条`}
+                type={importStats.failed === 0 ? "success" : "warning"}
               />
             </div>
           )}
