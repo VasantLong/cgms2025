@@ -138,3 +138,23 @@
     align-items: flex-start;
   }
 }
+
+/* 导入相关样式 */
+.import-preview {
+  max-height: 60vh;
+  overflow-y: auto;
+  margin-bottom: 16px;
+}
+
+.import-stats {
+  margin-top: 16px;
+}
+
+.import-preview table {
+  margin-top: 12px;
+}
+
+/* 错误高亮 */
+.ant-table-row-error {
+  background-color: #fff1f0;
+}

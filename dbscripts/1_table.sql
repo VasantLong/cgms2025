@@ -175,3 +175,19 @@ FOR EACH ROW EXECUTE FUNCTION set_class_cou_sn();
 -- 创建唯一索引：(stu_sn, cou_sn) 的唯一性约束
 CREATE UNIQUE INDEX idx_student_course_unique 
 ON class_student (stu_sn, cou_sn);
+
+
+-- 新增导入日志表
+CREATE TABLE IF NOT EXISTS grade_import_logs (
+    id SERIAL PRIMARY KEY,
+    class_sn INTEGER NOT NULL REFERENCES class(sn),
+    stu_sn INTEGER NOT NULL REFERENCES student(sn),
+    operator INTEGER NOT NULL REFERENCES sys_users(user_sn),
+    grade NUMERIC(5,2),
+    created_at TIMESTAMP DEFAULT NOW(),
+    CONSTRAINT valid_grade CHECK (grade BETWEEN 0 AND 100 OR grade IS NULL)
+);
+
+-- 添加日志索引
+CREATE INDEX idx_import_log_class ON grade_import_logs(class_sn);
+CREATE INDEX idx_import_log_operator ON grade_import_logs(operator);

@@ -1,12 +1,16 @@
 import asyncio
 from dataclasses import asdict
-import datetime as dt
-from fastapi import HTTPException, APIRouter, status, Depends
+from datetime import datetime
+from fastapi import HTTPException, APIRouter, status, Depends, UploadFile, File
 from typing import List
 from pydantic import BaseModel, field_validator
 from .config import dblock
 from .error import ConflictError, InvalidError
 from .auth import get_current_active_user, User
+from fastapi.responses import StreamingResponse
+import pandas as pd
+from io import BytesIO
+from urllib.parse import quote
 
 router = APIRouter(tags=["成绩管理"])
 
@@ -28,6 +32,23 @@ class GradeItem(BaseModel):
 
 class BatchGradeUpdate(BaseModel):
     grades: List[GradeItem]
+
+
+class ImportRecord(BaseModel):
+    stu_no: str
+    name: str
+    grade: float | None
+    remark: str | None
+
+class ImportRequest(BaseModel):
+    class_sn: int
+    records: List[ImportRecord]
+
+class ImportResult(BaseModel):
+    success: int
+    failed: int
+    invalid: int
+    logs: List[str]
 
 # 在grade.py添加测试路由
 @router.get("/api/debug/test")
@@ -145,7 +166,7 @@ async def delete_grade(stu_sn: int, cou_sn: int):
 
     return row
 
-@router.post("/grade/batch", summary="批量更新成绩")
+@router.post("/api/grade/batch", summary="批量更新成绩")
 async def batch_update_grades(
     update: BatchGradeUpdate,
     current_user: User = Depends(get_current_active_user)
@@ -187,3 +208,126 @@ async def batch_update_grades(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"批量更新失败: {str(e)}"
             )
+        
+
+@router.get("/api/grade/template/{class_sn}", summary="Excel模板")
+async def download_template(class_sn: int):
+    # 1. 获取班次学生列表
+    with dblock() as db:
+        db.execute("""
+            SELECT s.sn, s.no, s.name 
+            FROM student s
+            JOIN class_student cs ON s.sn = cs.stu_sn
+            WHERE cs.class_sn = %s
+            ORDER BY s.no
+        """, (class_sn,))
+        students = db.fetchall()
+
+        if len(students) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="该班次暂无学生，无法生成模板"
+            )
+
+    # 2. 生成Excel模板
+    df = pd.DataFrame([{
+        "学号": s.no,
+        "姓名": s.name,
+        "成绩": "",
+        "备注": ""
+    } for s in students])
+
+    buffer = BytesIO()
+    df.to_excel(buffer, index=False, engine="openpyxl")
+    buffer.seek(0)
+
+    # 3. 返回文件（修复中文文件名编码问题）
+    return StreamingResponse(
+        iter([buffer.getvalue()]),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote('成绩导入模板.xlsx')}"
+        }
+    )
+
+@router.post("/api/grade/import", summary="Excel导入成绩")
+async def import_grades(
+    request: ImportRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """导入Excel成绩并验证"""
+    stats = {
+        'success': 0,
+        'failed': 0,
+        'invalid': 0,
+        'logs': []
+    }
+    
+    with dblock() as db:
+        try:
+            db.execute("BEGIN")
+            
+            # 1. 验证班次有效性
+            db.execute("SELECT class_no FROM class WHERE sn = %s", (request.class_sn,))
+            class_info = db.fetchone()
+            if not class_info:
+                raise HTTPException(400, "班次不存在")
+            
+            # 2. 处理每条记录
+            for record in request.records:
+                try:
+                    # 验证学生是否存在于此班次
+                    db.execute("""
+                        SELECT s.sn FROM student s
+                        JOIN class_student cs ON s.sn = cs.stu_sn
+                        WHERE s.no = %s AND cs.class_sn = %s
+                    """, (record.stu_no, request.class_sn))
+                    student = db.fetchone()
+                    
+                    if not student:
+                        stats['logs'].append(f"学号 {record.stu_no} 不属于本班次")
+                        stats['invalid'] += 1
+                        continue
+                        
+                    # 验证成绩范围
+                    if record.grade is not None and (record.grade < 0 or record.grade > 100):
+                        stats['logs'].append(f"学号 {record.stu_no} 成绩超出范围")
+                        stats['invalid'] += 1
+                        continue
+                        
+                    # 执行插入/更新
+                    db.execute("""
+                        INSERT INTO class_grade (stu_sn, class_sn, grade)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (stu_sn, class_sn)
+                        DO UPDATE SET grade = EXCLUDED.grade
+                        RETURNING id
+                    """, (student.sn, request.class_sn, record.grade))
+                    
+                    if db.fetchone():
+                        stats['success'] += 1
+                        # 记录操作日志
+                        db.execute("""
+                            INSERT INTO grade_import_logs 
+                            (class_sn, stu_sn, operator, grade, created_at)
+                            VALUES (%s, %s, %s, %s, %s)
+                        """, (
+                            request.class_sn,
+                            student.sn,
+                            current_user.user_sn,
+                            record.grade,
+                            datetime.now()
+                        ))
+                    else:
+                        stats['failed'] += 1
+                        
+                except Exception as e:
+                    stats['logs'].append(f"学号 {record.stu_no} 处理失败: {str(e)}")
+                    stats['failed'] += 1
+            
+            db.execute("COMMIT")
+            return {"stats": stats}
+            
+        except Exception as e:
+            db.execute("ROLLBACK")
+            raise HTTPException(500, f"导入过程中出错: {str(e)}")
