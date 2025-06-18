@@ -24,15 +24,15 @@
 1. [ x ] **完善课程基础信息**（任务 3）
    - 分支：feature/course-basic-info
    - 前端：React 表单组件(webapp/src/course)
-   - 后端：RESTful API(appserv/serv/course.py)
-   - 数据库：PostgreSQL 表设计(dbscripts/1_table.sql)
+   - 后端：RESTful API course.py
+   - 数据库：PostgreSQL 表设计 1_table.sql
    - 依赖关系：无
    - 用户角色：教秘
 2. [ x ] **课程分班次功能**（任务 1、2、4）
    - 分支：feat/course-class-scheduling
    - 前端：React 表格组件(webapp/src/class)
-   - 后端：RESTful API(appserv/serv/course_class.py)
-   - 数据库：PostgreSQL 表设计(dbscripts/1_table.sql)
+   - 后端：RESTful API course_class.py
+   - 数据库：PostgreSQL 表设计 1_table.sql
    - 依赖关系：需要课程基础信息
    - 功能说明：
      1. 创建班次：班次号、班次名、学期、地点、课程
@@ -41,20 +41,20 @@
 3. [ x ] **选课功能**（任务 5）
    - 分支：feat/student-selection
    - 前端：ClassStudentSelection.jsx，公用组件 SearchBar.jsx 和 Pagination.jsx
-   - 后端：RESTful API(appserv/serv/selection.py)
+   - 后端：RESTful API selection.py
    - 数据库：PostgreSQL 表设计
    - 依赖关系：需要班次管理功能
 4. [ x ] **成绩录入**（任务 6）
    - 分支：feat/grade-entry
    - 前端：React 表单组件 GradeEntrySelection.jsx
-   - 后端：批量导入 API(appserv/serv/grade.py)
-   - 数据库：PostgreSQL 表设计(dbscripts/1_table.sql)
+   - 后端：批量导入 API grade.py
+   - 数据库：PostgreSQL 表设计 1_table.sql
    - 依赖关系：需要选课功能
-5. [ ] **成绩查询**（任务 7）
-   - 分支：feature/grade-query
-   - 前端：React 查询组件(webapp/src/grade/GradeList.jsx)
-   - 后端：复杂查询 API(appserv/serv/grade.py)
-   - 数据库：PostgreSQL 索引优化(dbscripts/1_table.sql)
+5. [ x ] **成绩查询**（任务 7）
+   - 分支：feat/grade-query
+   - 前端：React 查询组件 GradeQueryForm
+   - 后端：复杂查询 API grade.py
+   - 数据库：PostgreSQL 索引优化 1_table.sql
    - 依赖关系：需要成绩录入功能
 6. [ ] **报表生成**（任务 8）
    - 分支：feature/report-generation
@@ -62,8 +62,6 @@
    - 后端：报表生成 API(appserv/serv/student.py)
    - 数据库：PostgreSQL 视图(dbscripts/1_table.sql)
    - 依赖关系：需要成绩查询功能
-
-###
 
 ## 项目完成情况
 
@@ -144,6 +142,12 @@
       - 服务端版本校验（通过 check-conflict API 实现）
       - 数据完整性校验（前端 + 后端）
 
+- 任务 7：成绩查询。 ==v4.4.0==
+
+  - /webapp：默认输出所有学生成绩，支持课程单查询和课程＋班次/学期双查询
+  - /appserv：学生成绩多级查询 API
+  - /dbscripts：优化成绩查询索引
+
 1. 张三
    1. ….
    2. ….
@@ -169,3 +173,5 @@
    - feat/student-selection
 6. v4.3.0
    - feat/grade-entry
+7. v4.4.0
+   - feat/grade-query
