@@ -3,6 +3,12 @@ from dataclasses import asdict
 from fastapi import status, Query, Depends
 import datetime as dt
 from fastapi import HTTPException, APIRouter
+from fastapi.responses import StreamingResponse
+import io
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+import xlsxwriter  # 新增导入
+from reportlab.pdfgen import canvas  # 新增导入
 from .auth import get_current_active_user, User
 from .course_class import validate_jiaomi_role
 
@@ -30,6 +36,7 @@ class Student(BaseModel):
         if v and v < dt.date(2000, 1, 1):
             raise ValueError("入学日期必须在2000年1月1日之后")
         return v
+
 
 # 分页到时候再说
  #   page: int = Query(1, ge=1),
@@ -154,37 +161,86 @@ async def generate_student_report(
     validate_jiaomi_role(current_user.user_name)
     
     with dblock() as db:
-        # 获取学生基本信息
+        # 获取学生基本信息（复用已有查询逻辑）
         db.execute("""
-            SELECT s.sn AS stu_sn, 
-                   s.no AS stu_no, 
-                   s.name AS stu_name, 
-                   s.gender, s.enrollment_date 
-            FROM student s WHERE s.sn = %s
-            """, (stu_sn,))
+            SELECT sn AS stu_sn, no AS stu_no, name AS stu_name 
+            FROM student WHERE sn=%(stu_sn)s
+            """, {"stu_sn": stu_sn})
         student = db.fetchone()
+        if not student:
+            raise HTTPException(status_code=404, detail="学生不存在")
         
         # 获取成绩数据（基于已有视图）
         db.execute("""
-            SELECT 
-                c.name AS course_name,
-                cl.class_no,
-                cl.semester,
-                g.grade,
-                c.credit
+            SELECT c.name as course_name, 
+                   cl.class_no, cl.semester, 
+                   g.grade, c.credit
             FROM student_grade_report g
             JOIN class cl ON g.class_sn = cl.sn
             JOIN course c ON cl.cou_sn = c.sn
-            WHERE g.stu_sn = %s
-            ORDER BY cl.semester DESC
-        """, (stu_sn,))
+            WHERE g.stu_sn = %(stu_sn)s
+            """,
+            {"stu_sn": stu_sn})
         grades = db.fetchall()
+
+        # 计算统计信息
+        passed_courses = [g for g in grades if g.grade and g.grade >= 60]
+        total_credits = sum(g.credit for g in passed_courses)
+        valid_grades = [g.grade for g in passed_courses if g.grade]
+        gpa = sum(valid_grades)/len(valid_grades) if valid_grades else 0
+
         
     return {
-        "student": student,
-        "grades": grades,
+        "student": asdict(student),
+        "grades": [asdict(g) for g in grades],
         "stats": {
-            "total_credits": sum(g.credit for g in grades if g.grade >= 60),
-            "gpa": sum(g.grade * g.credit for g in grades) / sum(g.credit for g in grades) if grades else 0
+            "total_credits": total_credits,
+            "gpa": round(gpa, 2)  # 保留两位小数
         }
     }
+
+@router.get("/api/student/{stu_sn}/report/export", summary="导出学生报表")
+async def export_report(
+    stu_sn: int,
+    format: str = 'xlsx',
+    current_user: User = Depends(get_current_active_user)
+):
+    validate_jiaomi_role(current_user.user_name)
+    
+    report_data = await generate_student_report(stu_sn, current_user)
+    
+    # Excel导出实现
+    if format == 'xlsx':
+        output = io.BytesIO()
+        with xlsxwriter.Workbook(output) as workbook:
+            worksheet = workbook.add_worksheet()
+            
+            # 表头格式（与成绩模板一致）
+            header_format = workbook.add_format({
+                'bold': True, 
+                'bg_color': '#D3D3D3'
+            })
+            
+            # 写入数据（保持与前端表格相同的列顺序）
+            worksheet.write_row(0, 0, [
+                '课程名称', '班次号', '学期', '成绩', '学分'
+            ], header_format)
+            
+            for row, item in enumerate(report_data['grades'], start=1):
+                worksheet.write(row, 0, item['course_name'])
+                worksheet.write(row, 1, item['class_no'])
+                worksheet.write(row, 2, item['semester'])
+                worksheet.write(row, 3, item['grade'] or '未录入')
+                worksheet.write(row, 4, item['credit'])
+
+        return StreamingResponse(
+            io.BytesIO(output.getvalue()),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": 
+                f"attachment; filename=student_report_{stu_sn}.xlsx"
+            }
+        )
+    
+    # PDF导出（暂缓实现，保持接口扩展性）
+    raise HTTPException(status_code=501, detail="PDF导出功能开发中")

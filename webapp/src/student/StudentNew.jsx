@@ -10,9 +10,6 @@ function StudentNew(props) {
 
   return (
     <div className="paper">
-      <div className="paper-head">
-        <h3>新建学生信息</h3>
-      </div>
       <StudentDetail stuinfo={stuinfo} />
     </div>
   );

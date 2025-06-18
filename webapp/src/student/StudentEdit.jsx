@@ -29,9 +29,6 @@ function StudentEdit(props) {
 
   return (
     <div className="paper">
-      <div className="paper-head">
-        <h3>{`学生信息：${stuinfo.stu_name} (#${stuinfo.stu_sn})`}</h3>
-      </div>
       <StudentDetail stuinfo={stuinfo} />
     </div>
   );
