@@ -1,10 +1,14 @@
 import { Table, InputNumber, Button, message, Modal, Alert } from "antd";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { fetcher } from "../utils";
 import "./grade-entry.css";
 import * as XLSX from "xlsx";
 
-export default function GradeInputSection({ classinfo }) {
+export default function GradeEntrySection({ classinfo }) {
+  const autoSaveTimer = useRef(null); // 定时器引用
+  const countdownInterval = useRef(null); // 倒计时定时器引用
+  const lastVersion = useRef(null); // 新增版本追踪
+
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -13,41 +17,143 @@ export default function GradeInputSection({ classinfo }) {
   const [importVisible, setImportVisible] = useState(false);
   const [importStats, setImportStats] = useState(null);
 
+  const [hasChanges, setHasChanges] = useState(false);
+  const initialGrades = useRef(new Map()); // 使用Map存储初始成绩
+  const [autoSaveCountdown, setAutoSaveCountdown] = useState(0);
+  const AUTO_SAVE_DELAY = 30000; // 自动保存延迟（毫秒）
+  const DATA_CHECK_INTERVAL = 60000; // 数据检查间隔（毫秒）
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const data = await fetcher(
+        `/api/class/${classinfo.class_sn}/students-with-grades`
+      );
+      const processedData = data.map((s) => ({
+        ...s,
+        key: s.stu_sn,
+        grade: typeof s.grade === "number" ? s.grade : null,
+      }));
+
+      // 初始化基准数据
+      setStudents(processedData);
+      initialGrades.current = new Map(
+        processedData.map((s) => [s.stu_sn, s.grade]) // 使用处理后的数据
+      );
+      // 获取数据后初始化版本
+      const versionRes = await fetcher(
+        `/api/grade/check-conflict/${classinfo.class_sn}`
+      );
+      lastVersion.current = versionRes.version;
+    } catch (error) {
+      console.error("加载学生成绩失败:", error);
+      message.error(`加载失败: ${error.info?.detail || error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 加载班次学生数据及已有成绩
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        const data = await fetcher(
-          `/api/class/${classinfo.class_sn}/students-with-grades`
-        );
-        setStudents(
-          data.map((s) => ({
-            ...s,
-            key: s.stu_sn,
-            // 确保grade是数字或null
-            grade: typeof s.grade === "number" ? s.grade : null,
-          }))
-        );
-      } catch (error) {
-        console.error("加载学生成绩失败:", error);
-        message.error(`加载失败: ${error.info?.detail || error.message}`);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     if (classinfo?.class_sn) {
       loadData();
     }
   }, [classinfo.class_sn]);
 
+  // 在组件中新增版本检查逻辑
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const res = await fetcher(
+        `/api/grade/check-conflict/${classinfo.class_sn}`
+      );
+      if (res.version !== lastVersion.current) {
+        message.warning("检测到数据更新，正在刷新...");
+        loadData(); // 重新加载数据
+      }
+    }, DATA_CHECK_INTERVAL);
+    return () => clearInterval(interval);
+  }, [classinfo.class_sn]);
+
   // 处理成绩变更
   const handleGradeChange = (stu_sn, value) => {
-    setStudents((prev) =>
-      prev.map((s) => (s.stu_sn === stu_sn ? { ...s, grade: value } : s))
-    );
+    setStudents((prev) => {
+      const newStudents = prev.map((s) =>
+        s.stu_sn === stu_sn ? { ...s, grade: value } : s
+      );
+
+      // 检查是否有变更
+      const hasChange = newStudents.some(
+        (s) => s.grade !== initialGrades.current.get(s.stu_sn)
+      );
+      setHasChanges(hasChange);
+
+      // 1. 先清除所有现存定时器，重置倒计时30s
+      clearTimeout(autoSaveTimer.current);
+      if (countdownInterval.current) {
+        clearInterval(countdownInterval.current);
+      }
+      setAutoSaveCountdown(AUTO_SAVE_DELAY / 1000);
+
+      // 2. 设置新的自动保存计时器（30秒后触发）（防抖处理）
+      autoSaveTimer.current = setTimeout(() => {
+        // 使用prev和newStudents计算差异
+        const changes = newStudents
+          .filter((s, index) => s.grade !== prev[index].grade)
+          .map((s) => ({
+            stu_sn: s.stu_sn,
+            class_sn: classinfo.class_sn,
+            grade: s.grade,
+          }));
+
+        if (changes.length > 0) {
+          fetcher("/api/grade/batch", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ grades: changes }),
+          })
+            .then(() => {
+              // 自动保存成功后更新基准数据
+              initialGrades.current = new Map(
+                newStudents.map((s) => [s.stu_sn, s.grade])
+              );
+              setHasChanges(false);
+              setAutoSaveCountdown(0); // 保存成功立即清除倒计时
+              message.success("自动保存成功");
+            })
+            .catch((error) => {
+              console.error("自动保存失败:", error);
+              message.error("自动保存失败，请手动保存");
+            });
+        }
+      }, AUTO_SAVE_DELAY);
+
+      // 3. 设置倒计时更新间隔（每秒触发）（使用ref保持引用）
+      countdownInterval.current = setInterval(() => {
+        // 使用函数式更新确保状态准确性
+        setAutoSaveCountdown((prev) => Math.max(prev - 1, 0));
+      }, 1000);
+
+      // 4. 自动清理倒计时定时器
+      setTimeout(() => {
+        if (countdownInterval.current) {
+          clearInterval(countdownInterval.current);
+          countdownInterval.current = null;
+        }
+      }, AUTO_SAVE_DELAY);
+
+      return newStudents;
+    });
   };
+
+  // 组件卸载时的彻底清理
+  useEffect(() => {
+    return () => {
+      clearTimeout(autoSaveTimer.current);
+      if (countdownInterval.current) {
+        clearInterval(countdownInterval.current);
+      }
+    };
+  }, []);
 
   // 批量保存成绩
   const handleSave = async () => {
@@ -75,6 +181,10 @@ export default function GradeInputSection({ classinfo }) {
       });
 
       message.success(`成功保存 ${result.updated} 条成绩记录`);
+
+      // 保存成功后更新基准数据
+      initialGrades.current = new Map(students.map((s) => [s.stu_sn, s.grade]));
+      setHasChanges(false);
     } catch (error) {
       console.error("保存成绩失败:", error);
       message.error(`保存失败: ${error.info?.detail || error.message}`);
@@ -206,13 +316,14 @@ export default function GradeInputSection({ classinfo }) {
 
       if (result.stats.failed === 0) {
         message.success(`成功导入 ${result.stats.success} 条记录`);
-        setStudents((prev) =>
-          prev.map((s) => {
-            const imported = importData.data.find((i) => i.stu_no === s.stu_no);
-            return imported ? { ...s, grade: imported.grade } : s;
-          })
+        // 导入成功后更新基准数据
+        const updatedStudents = prev.map((s) => {
+          const imported = importData.data.find((i) => i.stu_no === s.stu_no);
+          return imported ? { ...s, grade: imported.grade } : s;
+        });
+        initialGrades.current = new Map(
+          updatedStudents.map((s) => [s.stu_sn, s.grade])
         );
-        handleCloseImportModal(); // 成功时关闭弹窗
       } else {
         message.warning(
           `导入完成，成功 ${result.stats.success} 条，失败 ${result.stats.failed} 条`
@@ -282,7 +393,7 @@ export default function GradeInputSection({ classinfo }) {
             type="primary"
             onClick={handleSave}
             loading={saving}
-            disabled={loading || students.length === 0}
+            disabled={!hasChanges || loading || students.length === 0}
           >
             {saving ? "保存中..." : "批量保存成绩"}
           </Button>
@@ -291,6 +402,11 @@ export default function GradeInputSection({ classinfo }) {
           <span>班次: {classinfo.class_no} | </span>
           <span>学生总数: {students.length} | </span>
           <span>已录入: {students.filter((s) => s.grade !== null).length}</span>
+          {autoSaveCountdown > 0 && (
+            <span style={{ marginLeft: 16, color: "#888" }}>
+              {autoSaveCountdown}秒后自动保存...
+            </span>
+          )}
         </div>
       </div>
 
