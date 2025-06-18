@@ -2,7 +2,7 @@ import { useRef, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetcher } from "../utils";
 import ClassStudentSelection from "./ClassStudentSelection";
-import GradeInputSection from "./GradeEntrySection";
+import GradeEntrySection from "./GradeEntrySection";
 import "./class.css";
 
 function ClassDetail({ classinfo }) {
@@ -481,7 +481,7 @@ function ClassDetail({ classinfo }) {
       {activeTab === "grades" && (
         <>
           <div className="paper-body">
-            <GradeInputSection classinfo={classinfo} />
+            <GradeEntrySection classinfo={classinfo} />
           </div>
           <div className="paper-footer">
             <div className="btns">

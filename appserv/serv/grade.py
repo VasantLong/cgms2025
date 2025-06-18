@@ -179,6 +179,12 @@ async def batch_update_grades(
         try:
             db.execute("BEGIN")
 
+            # 新增版本检查（防止覆盖）
+            db.execute("""
+                SELECT updated_at FROM class 
+                WHERE sn = %s FOR UPDATE
+            """, (update.grades[0].class_sn,))
+
             # 构建批量操作SQL
             values = []
             params = {}
@@ -200,6 +206,13 @@ async def batch_update_grades(
             db.execute(query, params)
             updated = len(db.fetchall())
 
+            # 新增更新时间戳
+            db.execute("""
+                UPDATE class 
+                SET updated_at = NOW()
+                WHERE sn = %s
+            """, (update.grades[0].class_sn,))
+
             db.execute("COMMIT")
             return {"updated": updated}
         except Exception as e:
@@ -209,11 +222,40 @@ async def batch_update_grades(
                 detail=f"批量更新失败: {str(e)}"
             )
         
+    # 记录变更日志
+    for grade in update.grades:
+        db.execute("""
+            INSERT INTO grade_audit_log 
+            (class_sn, stu_sn, old_grade, new_grade, operator)
+            SELECT %s, %s, g.grade, %s, %s
+            FROM class_grade g
+            WHERE g.stu_sn = %s AND g.class_sn = %s
+        """, (
+            grade.class_sn,
+            grade.stu_sn,
+            grade.grade,
+            current_user.user_sn,
+            grade.stu_sn,
+            grade.class_sn
+        ))
 
 @router.get("/api/grade/template/{class_sn}", summary="Excel模板")
 async def download_template(class_sn: int):
     # 1. 获取班次学生列表
     with dblock() as db:
+        db.execute("""
+            SELECT cl.class_no, cl.name 
+            FROM class AS cl
+            WHERE cl.sn = %s
+        """, (class_sn,))
+        class_info = db.fetchone()
+        
+        if not class_info:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="班次不存在"
+            )
+
         db.execute("""
             SELECT s.sn, s.no, s.name 
             FROM student s
@@ -246,7 +288,7 @@ async def download_template(class_sn: int):
         iter([buffer.getvalue()]),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
-            "Content-Disposition": f"attachment; filename*=UTF-8''{quote('成绩导入模板.xlsx')}"
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(f'{class_info.name}({class_info.class_no})成绩导入模板.xlsx')}"
         }
     )
 
@@ -276,6 +318,17 @@ async def import_grades(
             # 2. 处理每条记录
             for record in request.records:
                 try:
+                    # 新增类型检查
+                    if record.grade is not None:
+                        if not (0 <= record.grade <= 100):
+                            stats['logs'].append(f"学号 {record.stu_no} 成绩超出范围")
+                            stats['invalid'] += 1
+                            continue
+                        if not isinstance(record.grade, (int, float)):
+                            stats['logs'].append(f"学号 {record.stu_no} 成绩格式错误")
+                            stats['invalid'] += 1
+                            continue
+
                     # 验证学生是否存在于此班次
                     db.execute("""
                         SELECT s.sn FROM student s
@@ -331,3 +384,18 @@ async def import_grades(
         except Exception as e:
             db.execute("ROLLBACK")
             raise HTTPException(500, f"导入过程中出错: {str(e)}")
+        
+# 冲突检测接口
+@router.get("/api/grade/check-conflict/{class_sn}")
+async def check_grade_conflict(
+    class_sn: int,
+    current_user: User = Depends(get_current_active_user)
+):
+    with dblock() as db:
+        db.execute("""
+            SELECT updated_at 
+            FROM class 
+            WHERE sn = %s
+        """, (class_sn,))
+        row = db.fetchone()
+        return {"version": row.updated_at.isoformat() if row else None}

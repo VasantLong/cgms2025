@@ -191,3 +191,21 @@ CREATE TABLE IF NOT EXISTS grade_import_logs (
 -- 添加日志索引
 CREATE INDEX idx_import_log_class ON grade_import_logs(class_sn);
 CREATE INDEX idx_import_log_operator ON grade_import_logs(operator);
+
+
+-- 新增审计日志表
+CREATE TABLE IF NOT EXISTS grade_audit_log (
+    id SERIAL PRIMARY KEY,
+    class_sn INTEGER NOT NULL REFERENCES class(sn),
+    stu_sn INTEGER NOT NULL REFERENCES student(sn),
+    old_grade NUMERIC(5,2),
+    new_grade NUMERIC(5,2),
+    operator INTEGER NOT NULL REFERENCES sys_users(user_sn),
+    changed_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_audit_class ON grade_audit_log(class_sn);
+CREATE INDEX idx_audit_student ON grade_audit_log(stu_sn);
+
+-- 在class表中添加更新时间戳字段
+ALTER TABLE class ADD COLUMN updated_at TIMESTAMP DEFAULT NOW();
