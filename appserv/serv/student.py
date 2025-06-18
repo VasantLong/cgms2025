@@ -11,6 +11,7 @@ import xlsxwriter  # 新增导入
 from reportlab.pdfgen import canvas  # 新增导入
 from .auth import get_current_active_user, User
 from .course_class import validate_jiaomi_role
+from urllib.parse import quote_plus
 
 from pydantic import BaseModel, field_validator
 from .config import app, dblock
@@ -206,7 +207,29 @@ async def export_report(
     current_user: User = Depends(get_current_active_user)
 ):
     validate_jiaomi_role(current_user.user_name)
-    
+
+    with dblock() as db:  # 将整个操作放在同一个数据库连接中
+        # 获取学生信息和报表数据
+        db.execute("""
+            SELECT no AS stu_no FROM student 
+            WHERE sn=%(stu_sn)s
+            """, {"stu_sn": stu_sn})
+        student = db.fetchone()
+        if not student:
+            raise HTTPException(status_code=404, detail="学生不存在")
+
+        # 获取成绩数据
+        db.execute("""
+            SELECT c.name as course_name, 
+                   cl.class_no, cl.semester, 
+                   g.grade, c.credit
+            FROM student_grade_report g
+            JOIN class cl ON g.class_sn = cl.sn
+            JOIN course c ON cl.cou_sn = c.sn
+            WHERE g.stu_sn = %(stu_sn)s
+            """, {"stu_sn": stu_sn})
+        grades = db.fetchall()
+
     report_data = await generate_student_report(stu_sn, current_user)
     
     # Excel导出实现
@@ -233,12 +256,15 @@ async def export_report(
                 worksheet.write(row, 3, item['grade'] or '未录入')
                 worksheet.write(row, 4, item['credit'])
 
+        filename = f"学生成绩_{student.stu_no}_{dt.date.today().strftime('%Y%m%d')}.xlsx"
+        encoded_filename = quote_plus(filename, encoding='utf-8')
+        
         return StreamingResponse(
             io.BytesIO(output.getvalue()),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={
                 "Content-Disposition": 
-                f"attachment; filename=student_report_{stu_sn}.xlsx"
+                f"attachment; filename*=UTF-8''{encoded_filename}"
             }
         )
     

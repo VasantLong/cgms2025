@@ -158,20 +158,34 @@ function StudentDetail({ stuinfo }) {
   // 新增导出功能
   const handleExport = async (format) => {
     try {
-      const response = await fetcher(
-        `/api/student/${stuinfo.stu_sn}/report/export?format=${format}`
+      // 需要直接处理 blob 响应，因此使用fetch
+      const response = await fetch(
+        `/api/student/${stuinfo.stu_sn}/report/export?format=${format}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
       );
+
+      if (!response.ok) {
+        throw new Error(`导出失败：${response.statusText}`);
+      }
       const blob = await response.blob();
+      const filename =
+        response.headers.get("Content-Disposition")?.split("filename=")[1] ||
+        `学生成绩报告_${stuinfo.stu_no}_${new Date()
+          .toISOString()
+          .slice(0, 10)}.${format}`;
+
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `学生成绩报告_${stuinfo.stu_no}_${new Date()
-
-        .toISOString()
-        .slice(0, 10)}.${format}`;
+      a.download = decodeURIComponent(filename);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       setActionError("导出失败：" + error.message);
     }
