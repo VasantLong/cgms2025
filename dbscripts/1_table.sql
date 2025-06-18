@@ -72,7 +72,8 @@ ALTER TABLE class
 
 -- 添加班次序号字段（可选，或通过班次号解析）
 ALTER TABLE class ADD COLUMN class_seq SMALLINT;
-
+-- 在class表中添加更新时间戳字段
+ALTER TABLE class ADD COLUMN updated_at TIMESTAMP DEFAULT NOW();
 
 -- === 选课关联表（学生与班次关系）
 DROP TABLE IF EXISTS class_student;
@@ -107,6 +108,7 @@ CREATE TABLE IF NOT EXISTS class_grade  (
         CHECK (grade BETWEEN 0 AND 100 OR grade IS NULL),
     -- 唯一约束：一个学生在同一班次只能有一条成绩记录
     UNIQUE (stu_sn, class_sn),
+    updated_at TIMESTAMP DEFAULT NOW(),  -- 新增更新时间戳
     -- 外键约束
     CONSTRAINT fk_student FOREIGN KEY (stu_sn) 
         REFERENCES student(sn) ON DELETE CASCADE,
@@ -177,7 +179,7 @@ CREATE UNIQUE INDEX idx_student_course_unique
 ON class_student (stu_sn, cou_sn);
 
 
--- 新增导入日志表
+-- === 导入日志表
 CREATE TABLE IF NOT EXISTS grade_import_logs (
     id SERIAL PRIMARY KEY,
     class_sn INTEGER NOT NULL REFERENCES class(sn),
@@ -193,7 +195,7 @@ CREATE INDEX idx_import_log_class ON grade_import_logs(class_sn);
 CREATE INDEX idx_import_log_operator ON grade_import_logs(operator);
 
 
--- 新增审计日志表
+-- === 审计日志表
 CREATE TABLE IF NOT EXISTS grade_audit_log (
     id SERIAL PRIMARY KEY,
     class_sn INTEGER NOT NULL REFERENCES class(sn),
@@ -207,5 +209,18 @@ CREATE TABLE IF NOT EXISTS grade_audit_log (
 CREATE INDEX idx_audit_class ON grade_audit_log(class_sn);
 CREATE INDEX idx_audit_student ON grade_audit_log(stu_sn);
 
--- 在class表中添加更新时间戳字段
-ALTER TABLE class ADD COLUMN updated_at TIMESTAMP DEFAULT NOW();
+
+-- === 报表视图
+CREATE VIEW student_grade_report AS
+SELECT 
+    s.sn AS stu_sn,
+    s.no AS stu_no,
+    c.sn AS course_sn,
+    cl.sn AS class_sn,
+    g.grade,
+    g.updated_at AS grade_updated
+FROM student s
+JOIN class_student cs ON s.sn = cs.stu_sn  -- 先连接学生与班次关系
+JOIN class cl ON cs.class_sn = cl.sn       -- 再连接班次信息
+JOIN course c ON cl.cou_sn = c.sn          -- 最后连接课程信息
+LEFT JOIN class_grade g ON g.stu_sn = s.sn AND g.class_sn = cl.sn;  -- 左联成绩表

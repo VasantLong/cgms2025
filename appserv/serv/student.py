@@ -1,8 +1,10 @@
 import asyncio  # noqa: F401
 from dataclasses import asdict
-from fastapi import status, Query
+from fastapi import status, Query, Depends
 import datetime as dt
 from fastapi import HTTPException, APIRouter
+from .auth import get_current_active_user, User
+from .course_class import validate_jiaomi_role
 
 from pydantic import BaseModel, field_validator
 from .config import app, dblock
@@ -142,3 +144,47 @@ async def update_student(stu_sn: int, student: Student):
 async def delete_student(stu_sn):
     with dblock() as db:
         db.execute("DELETE FROM student WHERE sn=%(stu_sn)s", {"stu_sn": stu_sn})
+
+
+@router.get("/api/student/{stu_sn}/report", summary="生成学生报表")
+async def generate_student_report(
+    stu_sn: int,
+    current_user: User = Depends(get_current_active_user)
+):
+    validate_jiaomi_role(current_user.user_name)
+    
+    with dblock() as db:
+        # 获取学生基本信息
+        db.execute("""
+            SELECT s.sn AS stu_sn, 
+                   s.no AS stu_no, 
+                   s.name AS stu_name, 
+                   s.gender, s.enrollment_date 
+            FROM student s WHERE s.sn = %s
+            """, (stu_sn,))
+        student = db.fetchone()
+        
+        # 获取成绩数据（基于已有视图）
+        db.execute("""
+            SELECT 
+                c.name AS course_name,
+                cl.class_no,
+                cl.semester,
+                g.grade,
+                c.credit
+            FROM student_grade_report g
+            JOIN class cl ON g.class_sn = cl.sn
+            JOIN course c ON cl.cou_sn = c.sn
+            WHERE g.stu_sn = %s
+            ORDER BY cl.semester DESC
+        """, (stu_sn,))
+        grades = db.fetchall()
+        
+    return {
+        "student": student,
+        "grades": grades,
+        "stats": {
+            "total_credits": sum(g.credit for g in grades if g.grade >= 60),
+            "gpa": sum(g.grade * g.credit for g in grades) / sum(g.credit for g in grades) if grades else 0
+        }
+    }
