@@ -215,19 +215,6 @@ async def download_template(class_sn: int):
     # 1. 获取班次学生列表
     with dblock() as db:
         db.execute("""
-            SELECT cl.class_no, cl.name 
-            FROM class AS cl
-            WHERE cl.sn = %s
-        """, (class_sn,))
-        class_info = db.fetchone()
-        
-        if not class_info:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="班次不存在"
-            )
-
-        db.execute("""
             SELECT s.sn, s.no, s.name 
             FROM student s
             JOIN class_student cs ON s.sn = cs.stu_sn
@@ -259,7 +246,7 @@ async def download_template(class_sn: int):
         iter([buffer.getvalue()]),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
-            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(f'{class_info.name}({class_info.class_no})成绩导入模板.xlsx')}"
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote('成绩导入模板.xlsx')}"
         }
     )
 
@@ -289,17 +276,6 @@ async def import_grades(
             # 2. 处理每条记录
             for record in request.records:
                 try:
-                    # 新增类型检查
-                    if record.grade is not None:
-                        if not (0 <= record.grade <= 100):
-                            stats['logs'].append(f"学号 {record.stu_no} 成绩超出范围")
-                            stats['invalid'] += 1
-                            continue
-                        if not isinstance(record.grade, (int, float)):
-                            stats['logs'].append(f"学号 {record.stu_no} 成绩格式错误")
-                            stats['invalid'] += 1
-                            continue
-
                     # 验证学生是否存在于此班次
                     db.execute("""
                         SELECT s.sn FROM student s
