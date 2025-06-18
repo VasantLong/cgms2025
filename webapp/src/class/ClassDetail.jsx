@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetcher } from "../utils";
 import ClassStudentSelection from "./ClassStudentSelection";
+import GradeInputSection from "./GradeEntrySection";
 import "./class.css";
 
 function ClassDetail({ classinfo }) {
@@ -291,12 +292,12 @@ function ClassDetail({ classinfo }) {
 
   return (
     <>
-      {/* 头部显示班次信息 */}
+      {/* 头部班次信息 */}
       <div className="paper-head">
         <h2>{isNew ? "新建班次" : `班次详情：${classinfo.name}`}</h2>
       </div>
 
-      {/* 新增选项卡导航 */}
+      {/* 选项卡导航 */}
       <div className="tabs">
         <button
           className={`tab ${activeTab === "basic" ? "active" : ""}`}
@@ -305,17 +306,25 @@ function ClassDetail({ classinfo }) {
           基本信息
         </button>
         {!isNew && (
-          <button
-            className={`tab ${activeTab === "students" ? "active" : ""}`}
-            onClick={() => setActiveTab("students")}
-          >
-            学生管理
-          </button>
+          <>
+            <button
+              className={`tab ${activeTab === "students" ? "active" : ""}`}
+              onClick={() => setActiveTab("students")}
+            >
+              学生管理
+            </button>
+            <button
+              className={`tab ${activeTab === "grades" ? "active" : ""}`}
+              onClick={() => setActiveTab("grades")}
+            >
+              成绩录入
+            </button>
+          </>
         )}
       </div>
 
       {/* 选项卡内容 */}
-      {activeTab === "basic" ? (
+      {activeTab === "basic" && (
         <>
           <div className="paper-body">
             <form ref={formRef} onChange={checkChange}>
@@ -447,10 +456,32 @@ function ClassDetail({ classinfo }) {
             </div>
           </div>
         </>
-      ) : (
+      )}
+
+      {activeTab === "students" && (
+        <>
+          <div className="full-tab-container">
+            <ClassStudentSelection classinfo={classinfo} />
+          </div>
+          <div className="paper-footer">
+            <div className="btns">
+              <button
+                className="btn"
+                onClick={() => {
+                  navigate("/class/list");
+                }}
+              >
+                返回
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {activeTab === "grades" && (
         <>
           <div className="paper-body">
-            <ClassStudentSelection classinfo={classinfo} />
+            <GradeInputSection classinfo={classinfo} />
           </div>
           <div className="paper-footer">
             <div className="btns">

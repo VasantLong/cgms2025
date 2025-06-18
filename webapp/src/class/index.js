@@ -5,3 +5,4 @@ export { default as ClassNew } from "./ClassNew";
 export { default as ClassEdit } from "./ClassEdit";
 export { default as ClassDetail } from "./ClassDetail";
 export { default as ClassStudentSelection } from "./ClassStudentSelection";
+export { default as GradeEntrySection } from "./GradeEntrySection";

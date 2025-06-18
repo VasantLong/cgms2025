@@ -1,11 +1,12 @@
 import asyncio
 from dataclasses import asdict
 import datetime as dt
-from fastapi import HTTPException, APIRouter,status
-
+from fastapi import HTTPException, APIRouter, status, Depends
+from typing import List
 from pydantic import BaseModel, field_validator
-from .config import app, dblock
+from .config import dblock
 from .error import ConflictError, InvalidError
+from .auth import get_current_active_user, User
 
 router = APIRouter(tags=["成绩管理"])
 
@@ -19,6 +20,14 @@ class Grade(BaseModel):
         if v is not None and (v < 0 or v > 100):
             raise ValueError("成绩必须在0-100之间")
         return v
+
+class GradeItem(BaseModel):
+    stu_sn: int
+    class_sn: int
+    grade: float | None
+
+class BatchGradeUpdate(BaseModel):
+    grades: List[GradeItem]
 
 # 在grade.py添加测试路由
 @router.get("/api/debug/test")
@@ -135,3 +144,46 @@ async def delete_grade(stu_sn: int, cou_sn: int):
         )
 
     return row
+
+@router.post("/grade/batch", summary="批量更新成绩")
+async def batch_update_grades(
+    update: BatchGradeUpdate,
+    current_user: User = Depends(get_current_active_user)
+):
+    """批量更新成绩记录，自动处理插入和更新"""
+    if not update.grades:
+        return {"updated": 0}
+
+    with dblock() as db:
+        try:
+            db.execute("BEGIN")
+
+            # 构建批量操作SQL
+            values = []
+            params = {}
+            for i, grade in enumerate(update.grades):
+                params[f"stu_sn_{i}"] = grade.stu_sn
+                params[f"class_sn_{i}"] = grade.class_sn
+                params[f"grade_{i}"] = grade.grade
+                values.append(
+                    f"(%(stu_sn_{i})s, %(class_sn_{i})s, %(grade_{i})s)"
+                )
+
+            query = f"""
+                INSERT INTO class_grade (stu_sn, class_sn, grade)
+                VALUES {','.join(values)}
+                ON CONFLICT (stu_sn, class_sn) 
+                DO UPDATE SET grade = EXCLUDED.grade
+                RETURNING stu_sn, class_sn
+            """
+            db.execute(query, params)
+            updated = len(db.fetchall())
+
+            db.execute("COMMIT")
+            return {"updated": updated}
+        except Exception as e:
+            db.execute("ROLLBACK")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"批量更新失败: {str(e)}"
+            )
