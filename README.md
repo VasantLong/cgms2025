@@ -44,9 +44,9 @@
    - 后端：RESTful API(appserv/serv/selection.py)
    - 数据库：PostgreSQL 表设计
    - 依赖关系：需要班次管理功能
-4. [ ] **成绩录入**（任务 6）
-   - 分支：feature/grade-entry
-   - 前端：React 表单组件(webapp/src/grade/GradeList.jsx)
+4. [ x ] **成绩录入**（任务 6）
+   - 分支：feat/grade-entry
+   - 前端：React 表单组件 GradeEntrySelection.jsx
    - 后端：批量导入 API(appserv/serv/grade.py)
    - 数据库：PostgreSQL 表设计(dbscripts/1_table.sql)
    - 依赖关系：需要选课功能
@@ -114,6 +114,35 @@
   - 数据库表 class_student 包含班级序号、学生序号、选课时间
   - 后端 selection.py 具体实现了选课时的逻辑查询（可选学生、是否有学生已在当前课程其余班次的冲突情况）
   - 前端 ClassStudentSelection.jsx 融入 ClassDetail.jsx 中，在原有的编辑班次界面进行分栏（基本信息、学生管理），区分可选和有冲突的学生。
+- 任务 6：班次录入成绩。 ==v4.3.0==
+
+  - 班次成绩录入界面：表格形式展示学生名单，支持在线批量成绩输入与保存
+  - /appserv：批量成绩更新，学生成绩查询
+  - 可下载成绩导入模板 Excel，具有验证模板文件逻辑
+
+  1.  **实时协作增强**
+
+      - 自动保存防抖机制（30 秒阈值可配置）
+      - 数据版本冲突检测（30 秒轮询校验）
+      - 离开页面警告提示（防止数据丢失）
+
+  2.  **Excel 导入增强**
+      - 动态模板文件名验证（包含班次编号和名称）
+      - 成绩有效性实时校验（0-100 范围检查）
+      - 错误行高亮显示（含具体错误原因）
+      - 导入结果统计面板（成功/失败计数）
+  3.  **用户体验优化**
+
+      - 自动保存倒计时可视化
+      - 批量保存防重复点击
+      - 输入状态持久化（基于 localStorage）
+      - 表格固定列优化（学号列始终可见）
+
+  4.  **数据完整性保障**
+      - 基准数据快照机制（Map 存储初始值）
+      - 双重防抖策略（输入防抖 + 保存节流）
+      - 服务端版本校验（通过 check-conflict API 实现）
+      - 数据完整性校验（前端 + 后端）
 
 1. 张三
    1. ….
@@ -138,3 +167,5 @@
    - feat/course-class-scheduling
 5. v4.2.0
    - feat/student-selection
+6. v4.3.0
+   - feat/grade-entry
