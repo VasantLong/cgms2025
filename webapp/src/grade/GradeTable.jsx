@@ -31,10 +31,6 @@ function GradeTable({ items: externalItems }) {
     return <div>数据加载中...</div>;
   }
 
-  const testItems = [
-    { grade_sn: 1, stu_name: "张三", course_name: "高等数学", grade: 85.5 },
-  ];
-
   console.log("Grade数据:", items);
   console.log("当前用户token:", localStorage.getItem("token"));
 
@@ -49,7 +45,7 @@ function GradeTable({ items: externalItems }) {
       </thead>
       <tbody>
         {items?.map((item) => (
-          <tr key={`${item.stu_sn}-${item.course_sn}`}>
+          <tr key={item.grade_sn}>
             <td>{item.stu_name}</td>
             <td>{item.course_name}</td>
             <td>{item.grade ?? "未录入"}</td>

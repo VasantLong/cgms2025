@@ -13,25 +13,53 @@ function GradeList(props) {
     console.log("[DEBUG] GradeList 组件已挂载");
   }, []);
 
+  // 在组件顶部添加防抖hook
+  const useDebounce = (value, delay) => {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+    useEffect(() => {
+      const handler = setTimeout(() => {
+        setDebouncedValue(value);
+      }, delay);
+      return () => clearTimeout(handler);
+    }, [value, delay]);
+    return debouncedValue;
+  };
+
   // 新增查询表单组件
   const GradeQueryForm = () => {
+    const [params, setParams] = useState({
+      course_sn: undefined,
+      class_sn: undefined,
+      semester: undefined,
+    });
+    const [semesterInput, setSemesterInput] = useState("");
+    const debouncedSemester = useDebounce(semesterInput, 500);
+
     const { data: courses, isLoading: coursesLoading } = useSWR(
       "/api/course/list",
       fetcher
     );
     const { data: classes, isLoading: classesLoading } = useSWR(
-      "/api/class/list",
+      params.course_sn ? `/api/class/list?course_sn=${params.course_sn}` : null,
       fetcher
     );
 
-    const [params, setParams] = useState({});
-    const { data: grades, error } = useSWR(
-      () =>
-        params
-          ? `/api/grade/query?${new URLSearchParams(params).toString()}`
-          : null,
-      fetcher
-    );
+    // 学期选项从班次数据中提取
+    const semesters = [...new Set(classes?.map((c) => c.semester))].sort();
+
+    useEffect(() => {
+      setParams((p) => ({ ...p, semester: debouncedSemester }));
+    }, [debouncedSemester]);
+
+    const { data: grades, error } = useSWR(() => {
+      // 过滤无效参数
+      const validParams = Object.fromEntries(
+        Object.entries(params).filter(([_, v]) => v !== undefined && v !== null)
+      );
+      return Object.keys(validParams).length
+        ? `/api/grade/query?${new URLSearchParams(validParams).toString()}`
+        : null;
+    }, fetcher);
     if (coursesLoading || classesLoading) {
       return <div>加载筛选条件...</div>;
     }
@@ -46,25 +74,56 @@ function GradeList(props) {
             placeholder="选择课程"
             options={courses?.map((c) => ({
               value: c.course_sn,
-              label: c.course_name,
+              label: `${c.course_name} (${c.course_no})`, // 添加课程号显示
             }))}
-            onChange={(v) => setParams((p) => ({ ...p, course_sn: v }))}
+            onChange={(v) =>
+              setParams({
+                course_sn: v,
+                class_sn: undefined,
+                semester: undefined,
+              })
+            }
+            value={params.course_sn} // 新增value绑定
+            showSearch // 添加搜索功能
+            optionFilterProp="label" // 按标签过滤
+            style={{ minWidth: 200 }} // 新增固定宽度
           />
           <Select
             placeholder="选择班次"
             options={classes?.map((c) => ({
               value: c.class_sn,
-              label: c.class_no,
+              label: `${c.name} (${c.class_no})`,
             }))}
-            onChange={(v) => setParams((p) => ({ ...p, class_sn: v }))}
-          />
-          <Input
-            placeholder="输入学期（格式：2023-2024-1）"
-            onChange={(e) =>
-              setParams((p) => ({ ...p, semester: e.target.value }))
+            onChange={(v) =>
+              setParams((p) => ({
+                ...p,
+                class_sn: v,
+                semester: undefined,
+              }))
             }
+            value={params.class_sn}
+            disabled={!params.course_sn}
+            showSearch
+            optionFilterProp="label"
+            style={{ minWidth: 200 }}
+          />
+          <Select
+            placeholder="或选择学期"
+            options={semesters?.map((s) => ({ value: s, label: s }))}
+            onChange={(v) =>
+              setParams((p) => ({
+                ...p,
+                semester: v,
+                class_sn: undefined,
+              }))
+            }
+            value={params.semester}
+            showSearch
+            optionFilterProp="label"
+            style={{ minWidth: 200 }}
           />
         </div>
+        <GradeTable items={grades} />
       </div>
     );
   };
@@ -72,11 +131,8 @@ function GradeList(props) {
   return (
     <div className="paper">
       <h2>成绩查询</h2>
-      <div className="paper-head">
-        <GradeQueryForm />
-      </div>
       <div className="paper-body">
-        <GradeTable />
+        <GradeQueryForm />
       </div>
       {/* 保留原有调试信息 */}
       {props.debug && <pre>{JSON.stringify(grades, null, 2)}</pre>}

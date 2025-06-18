@@ -431,10 +431,11 @@ async def query_grades(
         
         if params.course_sn:
             conditions.append("c.sn = %(course_sn)s")
-        if params.class_sn:
-            conditions.append("cl.sn = %(class_sn)s")
-        if params.semester:
-            conditions.append("cl.semester = %(semester)s")
+            # 优先班次查询，若没有班次则用学期
+            if params.class_sn:
+                conditions.append("cl.sn = %(class_sn)s")
+            elif params.semester:
+                conditions.append("cl.semester = %(semester)s")
         
         if conditions:
             base_query += " AND " + " AND ".join(conditions)
