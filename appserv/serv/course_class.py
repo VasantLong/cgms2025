@@ -37,16 +37,25 @@ def validate_jiaomi_role(username: str):
         )
 
 @router.get("/api/class/list")
-async def get_class_list() -> list[Class]:
+async def get_class_list(
+    course_sn: int = Query(None),  # 新增过滤参数
+    current_user: User = Depends(get_current_active_user)
+):
     with dblock() as db:
-        db.execute("""
-        SELECT sn AS class_sn, class_no, name, semester, location, cou_sn
-        FROM class 
-        ORDER BY class_no, name
-        """)
-        data = [Class(**asdict(row)) for row in db]
-
-    return data
+        base_query = """
+            SELECT cl.sn AS class_sn, cl.class_no, cl.name, 
+                   cl.semester, cl.location, c.name AS course_name
+            FROM class cl
+            JOIN course c ON cl.cou_sn = c.sn
+        """
+        params = {}
+        if course_sn:
+            base_query += " WHERE cl.cou_sn = %(course_sn)s"
+            params["course_sn"] = course_sn
+            
+        base_query += " ORDER BY cl.semester DESC, cl.class_no"
+        db.execute(base_query, params)
+        return [asdict(row) for row in db]
 
 # 获取指定课程在特定学年学期下的最新班次序号
 @router.get("/api/class/sequence")

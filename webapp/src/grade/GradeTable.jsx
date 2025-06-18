@@ -3,31 +3,33 @@ import { fetcher } from "../utils";
 import { Link } from "react-router-dom";
 import "./grade.css";
 
-function GradeTable(props) {
-  const { data: items, error } = useSWR("/api/grade/list", fetcher, {
-    onSuccess: (data) => {
-      console.log("[DEBUG] Grade data:", data); // 添加数据日志
-    },
-    onError: (err) => {
-      console.error("[ERROR] Grade fetch error:", err); // 添加错误日志
-    },
+function GradeTable({ items: externalItems }) {
+  // 优先使用外部传入数据，无数据时保持独立请求能力
+  const { data: internalItems, error } = useSWR(
+    !externalItems ? "/api/grade/list" : null,
+    fetcher,
+    {
+      onSuccess: (data) => {
+        console.log("[DEBUG] Grade data:", data); // 添加数据日志
+      },
+      onError: (err) => {
+        console.error("[ERROR] Grade fetch error:", err); // 添加错误日志
+      },
 
-    shouldRetryOnError: false, // 添加请求重试配置
-    revalidateOnFocus: false,
-    revalidateOnReconnect: false, // 添加防缓存配置
-  });
+      shouldRetryOnError: false, // 添加请求重试配置
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false, // 添加防缓存配置
+    }
+  );
+
+  const items = externalItems || internalItems;
 
   if (error) {
     return <div>数据加载失败：{error.message}</div>;
   }
-
   if (!items) {
     return <div>数据加载中...</div>;
   }
-
-  const testItems = [
-    { grade_sn: 1, stu_name: "张三", course_name: "高等数学", grade: 85.5 },
-  ];
 
   console.log("Grade数据:", items);
   console.log("当前用户token:", localStorage.getItem("token"));
@@ -42,20 +44,13 @@ function GradeTable(props) {
         </tr>
       </thead>
       <tbody>
-        {items &&
-          items.map((item, idx) => (
-            <tr key={idx}>
-              <td>
-                <Link
-                  to={`/grade/student/${item.stu_sn}/course/${item.course_sn}`}
-                >
-                  {item.stu_name ? item.stu_name : "（空）"}
-                </Link>
-              </td>
-              <td>{item.course_name}</td>
-              <td>{item.grade}</td>
-            </tr>
-          ))}
+        {items?.map((item) => (
+          <tr key={item.grade_sn}>
+            <td>{item.stu_name}</td>
+            <td>{item.course_name}</td>
+            <td>{item.grade ?? "未录入"}</td>
+          </tr>
+        ))}
       </tbody>
     </table>
   );
