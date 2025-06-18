@@ -50,6 +50,11 @@ class ImportResult(BaseModel):
     invalid: int
     logs: List[str]
 
+class GradeQueryParams(BaseModel):
+    course_sn: int | None = None
+    class_sn: int | None = None
+    semester: str | None = None
+
 # 在grade.py添加测试路由
 @router.get("/api/debug/test")
 async def debug_test():
@@ -386,7 +391,7 @@ async def import_grades(
             raise HTTPException(500, f"导入过程中出错: {str(e)}")
         
 # 冲突检测接口
-@router.get("/api/grade/check-conflict/{class_sn}")
+@router.get("/api/grade/check-conflict/{class_sn}", summary="检测前端成绩数据改动")
 async def check_grade_conflict(
     class_sn: int,
     current_user: User = Depends(get_current_active_user)
@@ -399,3 +404,40 @@ async def check_grade_conflict(
         """, (class_sn,))
         row = db.fetchone()
         return {"version": row.updated_at.isoformat() if row else None}
+
+@router.get("/api/grade/query", summary="查询成绩")
+async def query_grades(
+    params: GradeQueryParams = Depends(),
+    current_user: User = Depends(get_current_active_user)
+):
+    with dblock() as db:
+        base_query = """
+            SELECT 
+                g.id AS grade_sn,
+                g.stu_sn,
+                s.name AS stu_name,
+                c.sn AS course_sn,
+                c.name AS course_name,
+                cl.class_no,
+                g.grade
+            FROM class_grade g
+            JOIN student s ON g.stu_sn = s.sn
+            JOIN class cl ON g.class_sn = cl.sn
+            JOIN course c ON cl.cou_sn = c.sn
+            WHERE 1=1
+        """
+        conditions = []
+        params_dict = params.model_dump()
+        
+        if params.course_sn:
+            conditions.append("c.sn = %(course_sn)s")
+        if params.class_sn:
+            conditions.append("cl.sn = %(class_sn)s")
+        if params.semester:
+            conditions.append("cl.semester = %(semester)s")
+        
+        if conditions:
+            base_query += " AND " + " AND ".join(conditions)
+        
+        db.execute(base_query, params_dict)
+        return [asdict(row) for row in db]
