@@ -123,6 +123,19 @@ function GradeList(props) {
             style={{ minWidth: 200 }}
           />
         </div>
+
+        {/* 新增统计信息 */}
+        {grades?.length > 0 && (
+          <div
+            className="stats-info"
+            style={{ margin: "12px 0", color: "#666" }}
+          >
+            共查询到 {grades.length} 条成绩
+            {params.class_sn && `（班次：${params.class_sn}）`}
+            {params.semester && `（学期：${params.semester}）`}
+          </div>
+        )}
+
         <GradeTable items={grades} />
       </div>
     );
