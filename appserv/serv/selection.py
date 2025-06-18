@@ -220,3 +220,25 @@ async def update_class_students(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"数据库关联失败: {str(e)}"
             )
+
+@router.get("/api/class/{class_sn}/students-with-grades", summary="获取班次学生及成绩")
+async def get_class_students_with_grades(
+    class_sn: int,
+    current_user: User = Depends(get_current_active_user)
+):
+    """获取班次学生列表及已有成绩"""
+    validate_jiaomi_role(current_user.user_name)
+    with dblock() as db:
+        db.execute("""
+            SELECT 
+                s.sn AS stu_sn,
+                s.no AS stu_no,
+                s.name AS stu_name,
+                g.grade
+            FROM student AS s
+            JOIN class_student AS cs ON s.sn = cs.stu_sn
+            LEFT JOIN class_grade AS g ON g.stu_sn = s.sn AND g.class_sn = cs.class_sn
+            WHERE cs.class_sn = %(class_sn)s
+            ORDER BY s.no
+        """, {"class_sn": class_sn})
+        return [asdict(row) for row in db]
