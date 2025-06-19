@@ -5,6 +5,9 @@ DELETE FROM course;
 DELETE FROM student;
 DELETE FROM user_passwords;
 DELETE FROM sys_users;
+DELETE FROM grade_import_logs;
+DELETE FROM grade_audit_log;
+
 
 -- 添加默认教秘账户（密码已哈希）
 INSERT INTO sys_users (username, real_name) VALUES 

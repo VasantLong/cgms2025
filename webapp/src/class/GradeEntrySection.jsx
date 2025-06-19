@@ -194,18 +194,44 @@ export default function GradeEntrySection({ classinfo }) {
   };
 
   // Excel模块
-  // 下载模板（增强版）
+  // 下载模板
   const handleDownloadTemplate = async () => {
     try {
-      // 使用 window.open 直接打开下载链接
-      window.open(
-        `/api/grade/template/${classinfo.class_sn}?token=${localStorage.getItem(
-          "token"
-        )}`,
-        "_blank"
+      const response = await fetch(
+        `/api/grade/template/${classinfo.class_sn}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
       );
+      if (!response.ok) {
+        throw new Error(`下载失败：${response.status} ${response.statusText}`);
+      }
+
+      // 解析文件名
+      const contentDisposition = response.headers.get("Content-Disposition");
+      const filename = contentDisposition
+        ? decodeURIComponent(contentDisposition.split("filename*=UTF-8''")[1])
+        : `${classinfo.class_no}_成绩模板.xlsx`;
+
+      // 创建隐藏下载链接
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.style.display = "none";
+
+      document.body.appendChild(link);
+      link.click();
+
+      // 清理资源
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       message.error(`模板下载失败: ${error.message}`);
+      console.error("模板下载错误:", error);
     }
   };
 
