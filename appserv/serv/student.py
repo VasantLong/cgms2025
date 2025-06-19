@@ -7,8 +7,8 @@ from fastapi.responses import StreamingResponse
 import io
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-import xlsxwriter  # 新增导入
-from reportlab.pdfgen import canvas  # 新增导入
+import xlsxwriter
+from reportlab.pdfgen import canvas
 from .auth import get_current_active_user, User
 from .course_class import validate_jiaomi_role
 from urllib.parse import quote_plus
@@ -46,7 +46,7 @@ class Student(BaseModel):
 async def get_student_list(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    last_sn: int = Query(None)  # 新增参数
+    last_sn: int = Query(None)
 ) -> list[Student]:
     with dblock() as db:
         query = """
@@ -186,17 +186,23 @@ async def generate_student_report(
 
         # 计算统计信息
         passed_courses = [g for g in grades if g.grade and g.grade >= 60]
+        failed_courses = [g for g in grades if g.grade and g.grade < 60]
         total_credits = sum(g.credit for g in passed_courses)
-        valid_grades = [g.grade for g in passed_courses if g.grade]
-        gpa = sum(valid_grades)/len(valid_grades) if valid_grades else 0
-
+        
+        # 计算加权平均分
+        weighted_sum = sum(g.grade * g.credit for g in passed_courses if g.grade)
+        gpa = weighted_sum / total_credits if total_credits else 0
         
     return {
         "student": asdict(student),
-        "grades": [asdict(g) for g in grades],
+        "grades": [{
+            **asdict(g),
+            "passed": "是" if (g.grade or 0) >= 60 else "否"
+        } for g in grades],
         "stats": {
             "total_credits": total_credits,
-            "gpa": round(gpa, 2)  # 保留两位小数
+            "gpa": round(gpa, 2),
+            "failed_count": len(failed_courses)
         }
     }
 
@@ -207,13 +213,17 @@ async def export_report(
     current_user: User = Depends(get_current_active_user)
 ):
     validate_jiaomi_role(current_user.user_name)
+    if format not in ('xlsx', 'pdf'):
+        raise HTTPException(status_code=400, detail="不支持的导出格式")
 
     with dblock() as db:  # 将整个操作放在同一个数据库连接中
         # 获取学生信息和报表数据
         db.execute("""
-            SELECT no AS stu_no FROM student 
+            SELECT no AS stu_no, name AS stu_name, 
+                gender, enrollment_date
+            FROM student 
             WHERE sn=%(stu_sn)s
-            """, {"stu_sn": stu_sn})
+        """, {"stu_sn": stu_sn})
         student = db.fetchone()
         if not student:
             raise HTTPException(status_code=404, detail="学生不存在")
@@ -238,26 +248,81 @@ async def export_report(
         with xlsxwriter.Workbook(output) as workbook:
             worksheet = workbook.add_worksheet()
             
-            # 表头格式（与成绩模板一致）
+            # 定义格式样式
             header_format = workbook.add_format({
                 'bold': True, 
-                'bg_color': '#D3D3D3'
+                'bg_color': '#D3D3D3',
+                'border': 1,
+                'align': 'center'
+            })
+            info_format = workbook.add_format({
+                'bold': True,
+                'bg_color': '#E8F4FF',
+                'border': 1,
+                'align': 'center'
+            })
+            stats_format = workbook.add_format({
+                'bold': True,
+                'bg_color': '#FFF2E0',
+                'border': 1,
+                'align': 'center'
             })
             
-            # 写入数据（保持与前端表格相同的列顺序）
-            worksheet.write_row(0, 0, [
-                '课程名称', '班次号', '学期', '成绩', '学分'
+            # 学生基本信息
+            worksheet.merge_range(0, 0, 0, 2, '学生基本信息', info_format)
+            worksheet.write_row(1, 0, [
+                f"学号：{student.stu_no}",
+                f"姓名：{student.stu_name}",
+                f"性别：{'男' if student.gender == 'M' else '女'}",
+            ], info_format)
+
+            # 课程表头
+            header_row = 2
+            worksheet.write_row(header_row, 0, [
+                '课程名称', '班次号', '学期', '成绩', '学分', '是否通过'
             ], header_format)
+
+            # 动态计算列宽
+            col_widths = [10]*6  # 初始最小宽度
+            max_data_row = header_row
             
-            for row, item in enumerate(report_data['grades'], start=1):
-                worksheet.write(row, 0, item['course_name'])
-                worksheet.write(row, 1, item['class_no'])
-                worksheet.write(row, 2, item['semester'])
-                worksheet.write(row, 3, item['grade'] or '未录入')
-                worksheet.write(row, 4, item['credit'])
+            # 写入课程数据
+            for row_idx, item in enumerate(report_data['grades'], start=header_row+1):
+                # 更新列宽
+                col_widths[0] = max(col_widths[0], len(item['course_name'])*2.3) # type: ignore
+                col_widths[1] = max(col_widths[1], len(str(item['class_no']))*1.5) # type: ignore
+                col_widths[2] = max(col_widths[2], len(item['semester'])*1.5) # type: ignore
+                col_widths[3] = max(col_widths[3], len(str(item['grade'] or '未录入')))
+                col_widths[4] = max(col_widths[4], len(str(item['credit'])))
+                col_widths[5] = max(col_widths[5], len(item['passed']))
+                
+                # 写入数据
+                worksheet.write(row_idx, 0, item['course_name'])
+                worksheet.write(row_idx, 1, item['class_no'])
+                worksheet.write(row_idx, 2, item['semester'])
+                worksheet.write(row_idx, 3, item['grade'] or '未录入')
+                worksheet.write(row_idx, 4, item['credit'])
+                worksheet.write(row_idx, 5, item['passed'])
+                max_data_row = row_idx
+
+            # 设置动态列宽（限制最大40）
+            for col, width in enumerate(col_widths):
+                worksheet.set_column(col, col, min(width, 40))
+
+            # 统计摘要
+            stats_row = max_data_row + 2
+            worksheet.merge_range(stats_row, 0, stats_row, 2, "成绩统计", stats_format)
+            worksheet.write_row(stats_row+1, 0, [
+                f"总学分：{report_data['stats']['total_credits']}",
+                f"加权平均分：{report_data['stats']['gpa']}",
+                f"不及格门数：{report_data['stats']['failed_count']}",
+            ], stats_format)
 
         filename = f"学生成绩_{student.stu_no}_{dt.date.today().strftime('%Y%m%d')}.xlsx"
         encoded_filename = quote_plus(filename, encoding='utf-8')
+        # 调整列宽
+        for i in range(6):  # 6列数据
+            worksheet.set_column(i, i, 15)  # 宽度设为15个字符
         
         return StreamingResponse(
             io.BytesIO(output.getvalue()),
