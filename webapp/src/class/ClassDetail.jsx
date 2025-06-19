@@ -183,35 +183,17 @@ function ClassDetail({ classinfo }) {
       navigate("/login");
       return;
     }
-    if (!isNew) {
-      // 编辑模式下的额外校验
-      const original = {
-        name: classinfo.name,
-        cou_sn: classinfo.cou_sn,
-        semester: classinfo.semester,
-        class_no: classinfo.class_no,
-      };
 
-      const current = {
-        name: generatedValues.name,
-        cou_sn: Number(selectedCouSn),
-        semester: generatedValues.semester,
-        class_no: generatedValues.class_no,
-      };
-
-      if (JSON.stringify(original) !== JSON.stringify(current)) {
-        setActionError("仅允许修改地点字段");
+    if (!formRef.current) return;
+    if (isNew) {
+      if (!formRef.current?.elements.cou_sn.value) {
+        setActionError("请选择关联课程");
         return;
       }
-    }
-    if (!formRef.current) return;
-    if (!formRef.current?.elements.cou_sn.value) {
-      setActionError("请选择关联课程");
-      return;
-    }
-    if (year === "" || semesterType === "") {
-      setActionError("请先选择学年和学期类型");
-      return;
+      if (year === "" || semesterType === "") {
+        setActionError("请先选择学年和学期类型");
+        return;
+      }
     }
 
     const elements = formRef.current.elements;
@@ -228,8 +210,20 @@ function ClassDetail({ classinfo }) {
       setBusy(true);
       setActionError(null);
 
-      let url = data.class_sn ? `/api/class/${data.class_sn}` : "/api/class";
-      let method = data.class_sn ? "PUT" : "POST";
+      let url, method;
+      if (isNew) {
+        // 保留新建班次的完整逻辑
+        url = "/api/class";
+        method = "POST";
+        data.class_no = generatedValues.class_no;
+        data.name = elements.name.value;
+        data.semester = generatedValues.semester;
+        data.cou_sn = Number(elements.cou_sn.value);
+      } else {
+        // 编辑模式仅使用PATCH方法
+        url = `/api/class/${data.class_sn}`;
+        method = "PATCH";
+      }
 
       const response = await fetch(url, {
         method,
@@ -237,7 +231,7 @@ function ClassDetail({ classinfo }) {
           "Content-Type": "application/json;charset=utf-8",
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(isNew ? data : { location: data.location }),
       });
 
       console.log("classdetial", response);
@@ -251,19 +245,24 @@ function ClassDetail({ classinfo }) {
 
       const class_data = await response.json();
 
+      // 修复点1：确保使用后端返回的class_sn
+      const targetSn = isNew ? class_data.class_sn : classinfo.class_sn;
+
+      // 修复点2：添加参数有效性校验
+      if (!targetSn) {
+        throw new Error("未能获取有效的班次编号");
+      }
+
       // 修改导航逻辑 - 传递状态避免重新生成
-      navigate(`/class/${class_data.class_sn}`, {
+      navigate(`/class/${targetSn}`, {
         state: {
           preservedValues: {
-            class_no: data.class_no,
-            semester: data.semester,
-            name: data.name,
-            // 保留其他必要字段
-            cou_sn: data.cou_sn,
-            location: data.location,
+            class_no: class_data.class_no || data.class_no,
+            semester: class_data.semester || data.semester,
+            name: class_data.name || data.name,
+            cou_sn: class_data.cou_sn || data.cou_sn,
+            location: class_data.location || data.location,
           },
-          // 标记这是从创建流程过来的
-          fromCreate: true,
         },
         replace: true, // 使用replace而不是push，避免历史记录问题
       });

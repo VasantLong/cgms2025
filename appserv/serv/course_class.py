@@ -1,6 +1,6 @@
 import asyncio
 from dataclasses import asdict
-from fastapi import status, Depends, Query
+from fastapi import status, Depends, Query, Body
 import datetime as dt
 from fastapi import HTTPException, APIRouter
 import re
@@ -36,7 +36,7 @@ def validate_jiaomi_role(username: str):
             detail="仅教秘用户可执行此操作"
         )
 
-@router.get("/api/class/list")
+@router.get("/api/class/list", summary="获取班次列表")
 async def get_class_list(
     course_sn: int = Query(None),  # 新增过滤参数
     current_user: User = Depends(get_current_active_user)
@@ -58,7 +58,7 @@ async def get_class_list(
         return [asdict(row) for row in db]
 
 # 获取指定课程在特定学年学期下的最新班次序号
-@router.get("/api/class/sequence")
+@router.get("/api/class/sequence", summary="获取最新班次序号")
 async def get_class_sequence(
     cou_sn: int, 
     year: int, 
@@ -90,7 +90,7 @@ async def get_class_sequence(
         max_sequence = row.max_seq if (row and row.max_seq is not None) else 0
         return {"max_sequence": max_sequence}
 
-@router.get("/api/class/{class_sn}")
+@router.get("/api/class/{class_sn}", summary="获取班次详情")
 async def get_class_profile(class_sn) -> Class:
     with dblock() as db:
         db.execute(
@@ -110,7 +110,7 @@ async def get_class_profile(class_sn) -> Class:
     return row
 
 # 确认课程号包含在班次号中
-@router.post("/api/class", status_code=status.HTTP_201_CREATED)
+@router.post("/api/class", summary="创建班次", status_code=status.HTTP_201_CREATED)
 async def create_class(
     class_data: Class, 
     current_user: User = Depends(get_current_active_user)
@@ -216,7 +216,7 @@ async def update_class(
     
     return class_data
 
-@router.delete("/api/class/{class_sn}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/api/class/{class_sn}", summary="删除班次", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_class(
     class_sn: int,
     current_user: User = Depends(get_current_active_user)
@@ -230,4 +230,27 @@ async def delete_class(
         if db.rowcount == 0:
             raise HTTPException(404, "班次不存在")
 
-# 其他辅助函数...
+@router.patch("/api/class/{class_sn}", status_code=status.HTTP_200_OK)
+async def update_class_location(
+    class_sn: int, 
+    location: str = Body(..., embed=True),
+    current_user: User = Depends(get_current_active_user)
+):
+    validate_jiaomi_role(current_user.user_name)
+    
+    with dblock() as db:
+        # 仅更新location字段
+        db.execute(
+            "UPDATE class SET location=%(loc)s WHERE sn=%(sn)s",
+            {"loc": location, "sn": class_sn}
+        )
+            # 修改返回数据，包含完整班次信息
+        db.execute("""
+            SELECT sn AS class_sn, class_no, 
+                   name, semester, location, cou_sn
+            FROM class WHERE sn=%(sn)s
+            """,
+            {"sn": class_sn}
+        )
+        updated_class = db.fetchone()
+    return updated_class
