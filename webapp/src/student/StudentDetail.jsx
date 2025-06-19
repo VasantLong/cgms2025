@@ -6,15 +6,22 @@ import useSWR from "swr";
 import "./student.css";
 
 function StudentDetail({ stuinfo }) {
-  const { data } = useSWR(`/api/student/${stuinfo.stu_sn}/report`, fetcher);
   const [activeTab, setActiveTab] = useState("basic");
   const formRef = useRef(null);
   let navigate = useNavigate();
-
   const isNew = stuinfo.stu_sn === null;
   const [isDirty, setDirty] = useState(false);
   const [isBusy, setBusy] = useState(false);
   const [actionError, setActionError] = useState(null);
+  const { data } = useSWR(
+    activeTab === "report" ? `/api/student/${stuinfo.stu_sn}/report` : null,
+    fetcher,
+    {
+      revalidateIfStale: false,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    }
+  );
 
   //　空表单或获取学生信息后，给表单设置初始值
   useEffect(() => {
@@ -312,6 +319,9 @@ function StudentDetail({ stuinfo }) {
             <div className="action-bar">
               <Button type="primary" onClick={() => handleExport("xlsx")}>
                 导出Excel
+              </Button>
+              <Button type="primary" onClick={() => handleExport("pdf")}>
+                导出PDF
               </Button>
               <span className="stats-summary">
                 总学分：{data?.stats.total_credits || 0}| 平均成绩：

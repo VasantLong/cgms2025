@@ -17,6 +17,18 @@ from pydantic import BaseModel, field_validator
 from .config import app, dblock
 from .error import ConflictError, InvalidError
 
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.platypus import Table, TableStyle, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
+try:
+    pdfmetrics.registerFont(TTFont('SimSun', '../fonts/simsun.ttc'))  # 需要字体文件
+except:
+    pdfmetrics.registerFont(TTFont('SimSun', '../fonts/simsun.ttf'))  # 尝试不同格式
+
 router = APIRouter(tags=["学生管理"])
 
 class Student(BaseModel):
@@ -333,5 +345,94 @@ async def export_report(
             }
         )
     
-    # PDF导出（暂缓实现，保持接口扩展性）
-    raise HTTPException(status_code=501, detail="PDF导出功能开发中")
+    # PDF导出实现
+    if format == 'pdf':
+        # 确保字体已注册
+        if 'SimSun' not in pdfmetrics.getRegisteredFontNames():
+            raise HTTPException(status_code=500, detail="请安装SimSun字体")
+
+        output = io.BytesIO()
+        c = canvas.Canvas(output, pagesize=A4)
+        width, height = A4
+
+        # 报表标题和导出时间
+        y_position = height - 40  # 初始Y坐标
+        c.setFont('SimSun', 16)
+        c.drawCentredString(width/2, y_position, "学生成绩报表")
+        c.setFont('SimSun', 10)
+        c.drawRightString(width-50, y_position, f"导出时间：{dt.datetime.now().strftime('%Y-%m-%d %H:%M')}")
+
+
+        # 学生基本信息
+        y_position -= 60 
+        c.setFont('SimSun', 12)
+        c.drawString(50, y_position, f"学号：{student.stu_no}")
+        y_position -= 30
+        c.drawString(50, y_position, f"姓名：{student.stu_name}")
+        y_position -= 30 
+        c.drawString(50, y_position, f"性别：{'男' if student.gender == 'M' else '女'}")
+        
+        
+        # 创建成绩表格
+        data = [
+            ['课程名称', '班次号', '学期', '成绩', '学分', '是否通过']
+        ]
+        for g in report_data['grades']:
+            data.append([
+                g['course_name'],
+                g['class_no'],
+                g['semester'],
+                str(g['grade']) if g['grade'] else '未录入',
+                str(g['credit']),
+                g['passed']
+            ])
+
+        # 自动计算列宽
+        col_widths = [width*0.3, width*0.15, width*0.15, width*0.1, width*0.1, width*0.1]
+        
+        # 创建表格并设置样式
+        table = Table(data, colWidths=col_widths)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.black),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('FONTNAME', (0,0), (-1,-1), 'SimSun'),  # 修改这里，应用全局字体
+            ('FONTSIZE', (0,0), (-1,0), 10),         # 表头字号
+            ('FONTSIZE', (0,1), (-1,-1), 9),         # 数据行字号
+            ('BOTTOMPADDING', (0,0), (-1,0), 12),
+            ('BACKGROUND', (0,1), (-1,-1), colors.white),
+            ('GRID', (0,0), (-1,-1), 1, colors.black)
+        ]))
+
+        # 绘制表格
+        y_position -= 40  # 基本信息与表格间距
+        table.wrapOn(c, width, height)
+        table.drawOn(c, 30, y_position - table._height)  # type: ignore # 自动计算表格高度
+
+        # 统计信息
+        stats_text = [
+            f"总学分：{report_data['stats']['total_credits']}",
+            f"加权平均分：{report_data['stats']['gpa']}",
+            f"不及格门数：{report_data['stats']['failed_count']}"
+        ]
+        y_position -= (table._height + 60) # type: ignore
+        c.setFont('SimSun', 14)
+        c.drawString(50, y_position, "成绩统计：")
+        y_position -= 30
+        c.setFont('SimSun', 12)
+        for i, text in enumerate(stats_text):
+            c.drawString(100, y_position - i*30, text)
+
+        c.save()
+        
+        filename = f"学生成绩_{student.stu_no}_{dt.date.today().strftime('%Y%m%d')}.pdf"
+        encoded_filename = quote_plus(filename, encoding='utf-8')
+        
+        return StreamingResponse(
+            io.BytesIO(output.getvalue()),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": 
+                f"attachment; filename*=UTF-8''{encoded_filename}"
+            }
+        )
