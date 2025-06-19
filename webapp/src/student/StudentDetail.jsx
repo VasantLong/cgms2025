@@ -165,29 +165,36 @@ function StudentDetail({ stuinfo }) {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
+          responseType: "blob",
         }
       );
 
       if (!response.ok) {
         throw new Error(`导出失败：${response.statusText}`);
       }
-      const blob = await response.blob();
-      const filename =
-        response.headers.get("Content-Disposition")?.split("filename=")[1] ||
-        `学生成绩报告_${stuinfo.stu_no}_${new Date()
-          .toISOString()
-          .slice(0, 10)}.${format}`;
 
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = decodeURIComponent(filename);
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const contentDisposition = response.headers.get("Content-Disposition");
+      const filename = contentDisposition
+        ? decodeURIComponent(contentDisposition.split("filename*=UTF-8''")[1])
+        : `学生成绩_${stuinfo.stu_no}_${new Date()
+            .toISOString()
+            .slice(0, 10)}.${format}`;
+
+      // 创建隐藏的下载链接
+      const link = document.createElement("a");
+      const url = window.URL.createObjectURL(await response.blob());
+      link.href = url;
+      link.setAttribute("download", filename);
+      link.style.display = "none";
+
+      document.body.appendChild(link);
+      link.click();
+
+      // 清理资源
+      document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      setActionError("导出失败：" + error.message);
+      setActionError(`导出失败：${error.message}`);
     }
   };
 
