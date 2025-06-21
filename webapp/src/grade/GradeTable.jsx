@@ -2,6 +2,7 @@ import useSWR from "swr";
 import { fetcher } from "../utils";
 import { Link } from "react-router-dom";
 import "./grade.css";
+import StyledTable from "../components/StyledTable";
 
 function GradeTable({ items: externalItems }) {
   // 优先使用外部传入数据，无数据时保持独立请求能力
@@ -35,7 +36,7 @@ function GradeTable({ items: externalItems }) {
   console.log("当前用户token:", localStorage.getItem("token"));
 
   return (
-    <table className="table">
+    <StyledTable>
       <thead>
         <tr>
           <th className="col-stu_name">学生姓名</th>
@@ -52,7 +53,7 @@ function GradeTable({ items: externalItems }) {
           </tr>
         ))}
       </tbody>
-    </table>
+    </StyledTable>
   );
 }
 

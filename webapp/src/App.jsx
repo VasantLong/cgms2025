@@ -13,7 +13,7 @@ import {
 import { Login } from "./login";
 import { PublicRoutes, PrivateRoutes, AuthProvider } from "./routes";
 import NaviMenu from "./NaviMenu";
-import "./components.css";
+//import "./components.css";
 import "./App.css";
 
 function App() {

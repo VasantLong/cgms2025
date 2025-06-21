@@ -3,9 +3,18 @@ import useSWR, { mutate } from "swr";
 import useSWRInfinite from "swr/infinite";
 import { fetcher } from "../utils";
 import { SearchBar } from "@components/SearchBar";
-import { Pagination } from "@components/Pagination";
 import "./student-selection.css";
 import { message } from "antd";
+import StyledTable from "../components/StyledTable";
+import {
+  Paper,
+  PaperHead,
+  PaperBody,
+  StatusBar,
+  Message,
+  ErrorMessage,
+  ErrorButton,
+} from "../components/StyledPaper";
 
 export default function ClassStudentSelection({ classinfo }) {
   useEffect(() => {
@@ -410,13 +419,6 @@ export default function ClassStudentSelection({ classinfo }) {
           </tbody>
         </table>
       </div>
-
-      {/* 分页加载更多（改进点9） */}
-      <Pagination
-        isLoading={isValidating}
-        hasMore={data?.[data.length - 1]?.length === 20} // 假设每页20条
-        onLoadMore={() => setSize(size + 1)}
-      />
 
       {/* 状态提示（改进点10） */}
       {isValidating && <div className="loading-indicator">加载中...</div>}

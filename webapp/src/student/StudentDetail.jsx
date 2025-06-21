@@ -10,6 +10,15 @@ import {
   Modal,
   message,
 } from "antd";
+import {
+  Paper,
+  PaperHead,
+  PaperBody,
+  StatusBar,
+  Message,
+  ErrorMessage,
+  ErrorButton,
+} from "../components/StyledPaper";
 import { fetcher } from "../utils";
 import useSWR, { mutate } from "swr";
 import { useSWRConfig } from "swr";
@@ -252,12 +261,12 @@ function StudentDetail({ stuinfo }) {
   return (
     <>
       {/* 头部 */}
-      <div className="paper-head">
+      <PaperHead>
         <h2>{isNew ? "新建学生档案" : `学生详情：${stuinfo.stu_name}`}</h2>
         <div className="head-actions">
           <Button onClick={() => navigate("/student/list")}>返回列表</Button>
         </div>
-      </div>
+      </PaperHead>
 
       {/* 选项卡导航 */}
       <div className="tabs">
@@ -277,7 +286,7 @@ function StudentDetail({ stuinfo }) {
 
       {/* 标签页内容 */}
       {activeTab === "basic" && (
-        <div className="paper-body">
+        <PaperBody>
           <form ref={formRef}>
             <div className="field">
               <label>学号: </label>
@@ -332,7 +341,7 @@ function StudentDetail({ stuinfo }) {
               />
             </div>
           </form>
-          <div className="paper-footer">
+          <PaperFooter>
             <div className="btns">
               <button className="btn" onClick={deleteAction} disabled={isBusy}>
                 删除
@@ -353,11 +362,11 @@ function StudentDetail({ stuinfo }) {
                 返回
               </button>
             </div>
-          </div>
-        </div>
+          </PaperFooter>
+        </PaperBody>
       )}
       {activeTab === "report" && (
-        <div className="paper-body">
+        <PaperBody>
           <div className="full-tab-container">
             <div className="action-bar">
               <Button type="primary" onClick={() => handleExport("xlsx")}>
@@ -422,20 +431,20 @@ function StudentDetail({ stuinfo }) {
               </button>
             </div>
           </div>
-        </div>
+        </PaperBody>
       )}
 
-      <div className="status-bar">
+      <StatusBar>
         {isBusy && <div className="processing-indicator">数据提交中...</div>}
         {actionError && (
-          <div className="error-message">
+          <ErrorMessage>
             ❌ 操作失败：{actionError}
             <button className="close-btn" onClick={() => setActionError(null)}>
               ×
             </button>
-          </div>
+          </ErrorMessage>
         )}
-      </div>
+      </StatusBar>
     </>
   );
 }

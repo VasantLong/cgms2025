@@ -58,30 +58,47 @@ class Student(BaseModel):
 async def get_student_list(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    last_sn: int = Query(None)
-) -> list[Student]:
-    with dblock() as db:
-        query = """
-        SELECT sn AS stu_sn, no AS stu_no, name AS stu_name, gender, enrollment_date 
-        FROM student
-        """
-        params = {}
+) -> dict:
+    try:
+        with dblock() as db:
+            # 计算偏移量
+            offset = (page - 1) * page_size
 
-        # 添加游标分页条件
-        if last_sn:
-            query += " WHERE sn > %(last_sn)s"
-            params["last_sn"] = last_sn
-        # 没有游标时使用传统分页
-        else:
-            params["offset"] = (page - 1) * page_size
+            # 查询总记录数
+            db.execute("SELECT COUNT(*) AS total FROM student")
+            total_row = db.fetchone()
+            total = total_row.total if total_row and hasattr(total_row, "total") else 0
 
-        query += " ORDER BY sn LIMIT %(limit)s"
-        params["limit"] = page_size
-        
-        db.execute(query, params)
-        data = [Student(**asdict(row)) for row in db]
+            # 查询当前页数据
+            db.execute("""
+                    SELECT sn AS stu_sn, 
+                        no AS stu_no, 
+                        name AS stu_name, 
+                        gender, 
+                        enrollment_date 
+                    FROM student
+                    LIMIT %(page_size)s OFFSET %(offset)s
+                    """, 
+                    {"page_size": page_size, "offset": offset})
+            result = db.fetchall()
 
-    return data
+            students = [
+                {
+                    "stu_sn": row.stu_sn,
+                    "stu_no": row.stu_no,
+                    "stu_name": row.stu_name,
+                    "gender": row.gender,
+                    "enrollment_date": row.enrollment_date.isoformat() if row.enrollment_date else None
+                }
+                for row in result
+            ]
+
+            return {
+                "data": students,
+                "total": total
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/api/student/{stu_sn}")

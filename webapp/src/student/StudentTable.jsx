@@ -2,7 +2,19 @@ import useSWRInfinite from "swr/infinite";
 import { fetcher } from "../utils";
 import { Link } from "react-router-dom";
 import "./student.css";
-import { Pagination } from "@components/Pagination";
+import useSWR from "swr";
+import React, { useState } from "react";
+import { Table, Pagination } from "antd";
+import StyledTable from "../components/StyledTable";
+import {
+  Paper,
+  PaperHead,
+  PaperBody,
+  StatusBar,
+  Message,
+  ErrorMessage,
+  ErrorButton,
+} from "../components/StyledPaper";
 
 function formatGender(v) {
   if (v === "M") return "男";
@@ -11,39 +23,51 @@ function formatGender(v) {
 }
 
 function StudentTable(props) {
-  const getKey = (pageIndex, previousPageData) => {
-    // 已经到达末尾
-    if (previousPageData && !previousPageData.length) return null;
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
-    // 第一页不使用游标
-    if (pageIndex === 0) return "/api/student/list?page_size=20";
+  const { data, error } = useSWR(
+    `/api/student/list?page=${currentPage}&page_size=${pageSize}`,
+    fetcher
+  );
+  //const items = data;
 
-    // 后续页使用最后一条记录的stu_sn作为游标
-    const lastSn = previousPageData[previousPageData.length - 1].stu_sn;
-    return `/api/student/list?last_sn=${lastSn}&page_size=20`;
+  const items = data && Array.isArray(data.data) ? data.data : [];
+  const total = data ? data.total : 0;
+
+  // 计算当前页显示的数据
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const currentItems = items.slice(startIndex, endIndex);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
   };
 
-  const { data, size, setSize, isValidating, error } = useSWRInfinite(
-    getKey,
-    fetcher,
-    {
-      revalidateFirstPage: false, // 防止第一页重复加载
-    }
-  );
-  // 合并所有页数据
-  const items = data ? data.flat() : [];
+  const handlePageSizeChange = (size) => {
+    setPageSize(size);
+    setCurrentPage(1); // 切换每页数量时，重置到第一页
+  };
 
   if (error) {
-    return <div>数据加载失败</div>;
+    return (
+      <>
+        <div>数据加载失败</div>
+        <ErrorButton onClick={() => window.location.reload()}>×</ErrorButton>
+      </>
+    );
   }
 
   if (!data) {
     return <div>数据加载中...</div>;
   }
 
+  // 计算总页数
+  const totalPages = Math.ceil(total / pageSize);
+
   return (
-    <div className="student-table-container">
-      <table className="table">
+    <PaperBody>
+      <StyledTable>
         <thead>
           <tr>
             <th className="col-stu_name">姓名</th>
@@ -67,14 +91,36 @@ function StudentTable(props) {
               </tr>
             ))}
         </tbody>
-      </table>
+      </StyledTable>
 
-      <Pagination
-        isLoading={isValidating}
-        onLoadMore={() => setSize(size + 1)}
-        hasMore={data && data[data.length - 1]?.length === 20}
-      />
-    </div>
+      <div className="pagination">
+        <button
+          onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+          disabled={currentPage === 1}
+        >
+          上一页
+        </button>
+        <span>
+          第 {currentPage} 页，共 {totalPages} 页
+        </span>
+        <select
+          value={pageSize}
+          onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+        >
+          <option value="10">10</option>
+          <option value="20">20</option>
+          <option value="50">50</option>
+        </select>
+        <button
+          onClick={() =>
+            handlePageChange(Math.min(totalPages, currentPage + 1))
+          }
+          disabled={currentPage === totalPages}
+        >
+          下一页
+        </button>
+      </div>
+    </PaperBody>
   );
 }
 

@@ -1,6 +1,7 @@
 import useSWR from "swr";
 import { fetcher } from "../utils";
 import { Link } from "react-router-dom";
+import StyledTable from "../components/StyledTable";
 import "./course.css";
 
 function CourseTable(props) {
@@ -16,7 +17,7 @@ function CourseTable(props) {
   }
 
   return (
-    <table className="table">
+    <StyledTable>
       <thead>
         <tr>
           <th className="col-course_no">课程编号</th>
@@ -40,7 +41,7 @@ function CourseTable(props) {
             </tr>
           ))}
       </tbody>
-    </table>
+    </StyledTable>
   );
 }
 

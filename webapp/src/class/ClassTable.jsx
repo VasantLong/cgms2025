@@ -2,6 +2,16 @@ import useSWR from "swr";
 import { fetcher } from "../utils";
 import { Link } from "react-router-dom";
 import "./class.css";
+import StyledTable from "../components/StyledTable";
+import {
+  Paper,
+  PaperHead,
+  PaperBody,
+  StatusBar,
+  Message,
+  ErrorMessage,
+  ErrorButton,
+} from "../components/StyledPaper";
 
 const ClassTable = (props) => {
   const { data: items, error } = useSWR("/api/class/list", fetcher, {
@@ -20,7 +30,7 @@ const ClassTable = (props) => {
   }
 
   return (
-    <table className="table">
+    <StyledTable>
       <thead>
         <tr>
           <th className="col-class_no">班次号</th>
@@ -44,7 +54,7 @@ const ClassTable = (props) => {
             </tr>
           ))}
       </tbody>
-    </table>
+    </StyledTable>
   );
 };
 export default ClassTable;

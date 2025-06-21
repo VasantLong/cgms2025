@@ -2,6 +2,7 @@ import { useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import StudentDetail from "./StudentDetail";
 import useSWR from "swr";
+import StyledPaper from "../components/StyledPaper";
 
 function StudentNew(props) {
   let stuinfo = {
@@ -9,9 +10,9 @@ function StudentNew(props) {
   };
 
   return (
-    <div className="paper">
+    <StyledPaper>
       <StudentDetail stuinfo={stuinfo} />
-    </div>
+    </StyledPaper>
   );
 }
 

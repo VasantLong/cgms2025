@@ -1,4 +1,4 @@
-.btn {
+/*.btn {
   color: #fff;
   background-color: hsl(329, 45%, 38%);
   border-color: hsl(329, 45%, 38%);
@@ -44,8 +44,8 @@
 
 .btn > form > input[type="submit"]:focus {
   outline: none;
-}
-
+}*/
+/*
 .paper {
   box-shadow: 4px 5px 4px 2px #aaa;
   padding: 2em;
@@ -103,8 +103,8 @@
   font-size: 1.2em;
   color: #6f6fb7;
   cursor: pointer;
-}
-
+}*/
+/*
 table.table {
   width: 100%;
   border-collapse: collapse;
@@ -140,3 +140,4 @@ table.table {
 .table tr:nth-child(even) {
   background-color: hsl(306, 40%, 90%);
 }
+*/

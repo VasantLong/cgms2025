@@ -6,6 +6,16 @@ import { Table, InputNumber, Button, message, Modal, Alert } from "antd";
 import ClassStudentSelection from "./ClassStudentSelection";
 import GradeEntrySection from "./GradeEntrySection";
 import "./class.css";
+import StyledTable from "../components/StyledTable";
+import {
+  Paper,
+  PaperHead,
+  PaperBody,
+  StatusBar,
+  Message,
+  ErrorMessage,
+  ErrorButton,
+} from "../components/StyledPaper";
 
 function ClassDetail({ classinfo }) {
   const formRef = useRef();

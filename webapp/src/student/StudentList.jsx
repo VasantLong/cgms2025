@@ -1,25 +1,35 @@
 import { useNavigate } from "react-router-dom";
+import React from "react";
+import { Button } from "antd";
 import StudentTable from "./StudentTable";
+import {
+  Paper,
+  PaperHead,
+  PaperBody,
+  StatusBar,
+  Message,
+  ErrorMessage,
+  ErrorButton,
+} from "../components/StyledPaper";
+import StyledButton from "../components//StyledButton";
 
 function StudentList(props) {
   let navigate = useNavigate();
 
   return (
-    <div className="paper">
-      <div className="paper-head">
-        <button
+    <Paper>
+      <PaperHead>
+        <StyledButton
           className="btn"
           onClick={() => {
             navigate("/student/new");
           }}
         >
           新建学生记录
-        </button>
-      </div>
-      <div className="paper-body">
-        <StudentTable />
-      </div>
-    </div>
+        </StyledButton>
+      </PaperHead>
+      <StudentTable />
+    </Paper>
   );
 }
 
