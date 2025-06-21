@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { fetcher } from "../utils";
 
 function CourseDetail({ courseinfo }) {
   const formRef = useRef(null);
@@ -25,22 +26,13 @@ function CourseDetail({ courseinfo }) {
   }, [courseinfo]);
 
   const checkChange = (e) => {
-    if (!formRef.current) return;
-
-    if (courseinfo.course_sn === null) {
-      if (!isDirty) setDirty(true);
-      return;
-    }
-
-    for (let fieldName of ["course_no", "course_name", "credit", "hours"]) {
-      if (courseinfo[fieldName] !== formRef.current.elements[fieldName].value) {
-        if (!isDirty) setDirty(true);
-        return;
-      }
-    }
-
-    if (isDirty) {
-      setDirty(false);
+    // 检查输入验证逻辑
+    if (e.target.name === "course_no" && !e.target.value.match(/^\d{5}$/)) {
+      setActionError("detail：课程号必须为 5 位数字");
+    } else if (e.target.name === "credit" && Number(e.target.value) <= 0) {
+      setActionError("detail：学分必须大于 0");
+    } else {
+      setActionError(null);
     }
   };
 
@@ -71,46 +63,37 @@ function CourseDetail({ courseinfo }) {
       setBusy(true);
 
       // 向服务器发送请求
-      let response = await fetch(url, {
+      const response = await fetcher(url, {
         method: http_method,
         headers: {
           "Content-Type": "application/json;charset=utf-8",
         },
-        body: JSON.stringify(data), // 将data对象序列化为JSON的字符串
+        body: JSON.stringify(data),
       });
 
-      console.log("coursedetial", response);
-
-      if (!response.ok) {
-        // TODO: 较草率处理错误
-        console.error(response);
-        const error = await response.json();
-        setActionError(error.message);
-        return;
-      }
-
-      const course = await response.json();
-
       if (courseinfo.course_sn === null) {
-        navigate(`/course/${course.course_sn}/edit`);
+        navigate(`/course/${response.course_sn}/edit`);
         return;
       }
+    } catch (error) {
+      setActionError(error.info?.detail || error.message);
     } finally {
       setBusy(false);
     }
   };
 
   const deleteAction = async () => {
-    let response = await fetch(`/api/course/${courseinfo.course_sn}`, {
-      method: "DELETE",
-    });
-
-    if (!response.ok) {
-      console.error(response);
-      return;
+    try {
+      setBusy(true);
+      await fetcher(`/api/course/${courseinfo.course_sn}`, {
+        method: "DELETE",
+      });
+      navigate("/course/list");
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setBusy(false);
     }
-
-    navigate("/course/list");
   };
 
   return (
@@ -170,7 +153,7 @@ function CourseDetail({ courseinfo }) {
           <button
             className="btn"
             onClick={saveAction}
-            disabled={isBusy || !isDirty}
+            disabled={isBusy || !!actionError}
           >
             保存
           </button>

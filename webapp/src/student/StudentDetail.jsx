@@ -104,62 +104,50 @@ function StudentDetail({ stuinfo }) {
       return;
     }
 
-    let url, http_method;
+    let url;
     if (isNew) {
-      // 新建学生记录
       url = `/api/student`;
-      http_method = "POST";
     } else {
-      // 更新学生记录信息
       url = `/api/student/${stuinfo.stu_sn}`;
-      http_method = "PUT";
     }
 
     try {
       setBusy(true); // 开始向服务提交请求，设置为忙
 
-      // 向服务器发送请求
-      let response = await fetch(url, {
-        method: http_method,
+      // 使用 fetcher 函数发送请求
+      const response = await fetcher(url, {
+        method: isNew ? "POST" : "PUT",
         headers: {
           "Content-Type": "application/json;charset=utf-8",
         },
-        body: JSON.stringify(data), // 将data对象序列化为JSON的字符串
+        body: JSON.stringify(data),
       });
-
-      console.log("studetail", response);
-
-      if (!response.ok) {
-        // TODO: 较草率处理错误
-        console.error(response);
-        const error = await response.json();
-        setActionError(error.message);
-        return;
-      }
-
-      const student = await response.json();
 
       if (stuinfo.stu_sn === null) {
         // 创建新学生记录后，按照新分配的序号重新加载学生信息
-        navigate(`/student/${student.stu_sn}`);
+        navigate(`/student/${response.stu_sn}`);
         return;
       }
+    } catch (error) {
+      setActionError(error.info?.detail || error.message);
     } finally {
       setBusy(false); // 动作结束，设置为非忙
     }
   };
 
   const deleteAction = async () => {
-    let response = await fetch(`/api/student/${stuinfo.stu_sn}`, {
-      method: "DELETE",
-    });
-
-    if (!response.ok) {
-      console.error(response);
-      return;
+    try {
+      setBusy(true); // 开始删除操作，设置为忙
+      // 使用 fetcher 函数发送删除请求
+      await fetcher(`/api/student/${stuinfo.stu_sn}`, {
+        method: "DELETE",
+      });
+      navigate("/student/list");
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setBusy(false); // 动作结束，设置为非忙
     }
-
-    navigate("/student/list");
   };
 
   // 新增导出功能
@@ -206,7 +194,6 @@ function StudentDetail({ stuinfo }) {
   };
 
   return (
-    // 标签<> </>在JSX表示嵌套是一段JSX元素的片段
     <>
       {/* 头部 */}
       <div className="paper-head">
