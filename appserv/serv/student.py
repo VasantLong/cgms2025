@@ -159,10 +159,23 @@ async def update_student(stu_sn: int, student: Student):
             student.model_dump(),
         )
 
+@router.get("/api/student/{stu_sn}/has-grades", summary="检查学生是否有成绩记录")
+async def student_has_grades(stu_sn: int):
+    with dblock() as db:
+        db.execute("""
+            SELECT 1 AS has_grade
+            FROM class_grade
+            WHERE stu_sn = %(stu_sn)s
+            LIMIT 1
+        """, {"stu_sn": stu_sn})
+        grade_record = db.fetchone()
+        return {"has_grades": bool(grade_record)}
+
 
 @router.delete("/api/student/{stu_sn}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_student(stu_sn):
     with dblock() as db:
+        # 执行删除操作
         db.execute("DELETE FROM student WHERE sn=%(stu_sn)s", {"stu_sn": stu_sn})
 
 

@@ -1,8 +1,18 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Tabs, Descriptions, Table, Statistic, Button, Card } from "antd";
+import {
+  Tabs,
+  Descriptions,
+  Table,
+  Statistic,
+  Button,
+  Card,
+  Modal,
+  message,
+} from "antd";
 import { fetcher } from "../utils";
-import useSWR from "swr";
+import useSWR, { mutate } from "swr";
+import { useSWRConfig } from "swr";
 import "./student.css";
 
 function StudentDetail({ stuinfo }) {
@@ -41,7 +51,7 @@ function StudentDetail({ stuinfo }) {
     elements.enrollment_date.value = stuinfo.enrollment_date ?? null;
 
     setDirty(false);
-  }, [stuinfo, isNew]);
+  }, [stuinfo, isNew, activeTab]);
 
   const checkChange = (e) => {
     if (!formRef.current) return;
@@ -51,10 +61,30 @@ function StudentDetail({ stuinfo }) {
       return;
     }
 
+    const fieldName = e.target.name;
+    const value = e.target.value;
+
     for (let fieldName of ["stu_no", "stu_name", "gender", "enrollment_date"]) {
       if (stuinfo[fieldName] !== formRef.current.elements[fieldName].value) {
         if (!isDirty) setDirty(true);
         return;
+      }
+      if (fieldName === "enrollment_date" || fieldName === "stu_no") {
+        const enrollmentDate = formRef.current.elements.enrollment_date.value;
+        const stuNo = formRef.current.elements.stu_no.value;
+        console.log(enrollmentDate, stuNo);
+        if (enrollmentDate && stuNo) {
+          const enrollmentYear = new Date(enrollmentDate)
+            .getFullYear()
+            .toString()
+            .slice(2);
+          const stuNoPrefix = stuNo.slice(0, 2);
+
+          if (enrollmentYear !== stuNoPrefix) {
+            setActionError("学号的前两位应与入学时间的年份后两位对应");
+            return;
+          }
+        }
       }
     }
 
@@ -138,13 +168,41 @@ function StudentDetail({ stuinfo }) {
   const deleteAction = async () => {
     try {
       setBusy(true); // 开始删除操作，设置为忙
-      // 使用 fetcher 函数发送删除请求
-      await fetcher(`/api/student/${stuinfo.stu_sn}`, {
-        method: "DELETE",
-      });
-      navigate("/student/list");
+
+      // 检查学生是否有成绩记录
+      const { has_grades } = await fetcher(
+        `/api/student/${stuinfo.stu_sn}/has-grades`
+      );
+      if (has_grades) {
+        message.error("该学生有成绩记录，不能删除");
+        return;
+      } else {
+        // 发送删除请求前给出确认提示
+        const confirmResult = await new Promise((resolve) => {
+          Modal.confirm({
+            title: "警告",
+            content: "该操作不可逆，请谨慎确认，是否继续删除？",
+            okText: "确认删除",
+            cancelText: "取消",
+            onOk: () => resolve(true),
+            onCancel: () => resolve(false),
+          });
+        });
+
+        if (!confirmResult) {
+          return;
+        }
+        // 使用 fetcher 函数发送删除请求
+        await fetcher(`/api/student/${stuinfo.stu_sn}`, {
+          method: "DELETE",
+        });
+        // 手动刷新学生列表
+        mutate("/api/student/list");
+        navigate("/student/list");
+      }
     } catch (error) {
-      console.error(error);
+      message.error(error.info?.detail || error.message);
+      setActionError(error.info?.detail || error.message);
     } finally {
       setBusy(false); // 动作结束，设置为非忙
     }
@@ -160,10 +218,8 @@ function StudentDetail({ stuinfo }) {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-          responseType: "blob",
         }
       );
-
       if (!response.ok) {
         throw new Error(`导出失败：${response.statusText}`);
       }
@@ -199,7 +255,7 @@ function StudentDetail({ stuinfo }) {
       <div className="paper-head">
         <h2>{isNew ? "新建学生档案" : `学生详情：${stuinfo.stu_name}`}</h2>
         <div className="head-actions">
-          <Button onClick={() => navigate(-1)}>返回列表</Button>
+          <Button onClick={() => navigate("/student/list")}>返回列表</Button>
         </div>
       </div>
 

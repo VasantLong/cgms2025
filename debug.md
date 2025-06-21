@@ -7,10 +7,10 @@
 1. 新建学生档案
    1. 逻辑问题：输入学号的前两位应该与入学时间的年相对应【优化】
    2. 字段都输入好了后，点击保存，POST 8501，然后 GET 8501 进入学生详情页。
-   3. 在学生详情页的 active tab 来回切换（GET 8501）后，回到基本信息栏，字段内容都消失了。【问题】
+   3. 在学生详情页的 active tab 来回切换（GET 8501）字段保持。
    4. 点击返回列表按钮后，GET 8501
 2. 进入某学生的编辑模式 GET 8501
-   1. 点击删除（DELETE 8501 返回 http204）后，没有请求更新学生列表。【问题】
+   1. 点击删除（DELETE 8501 返回 http204）后，返回列表，但是列表未更新。【问题】
 
 ## 2.课程
 
@@ -112,79 +112,9 @@
 
    2. 点击删除按钮（DELETE 8501），有两种情况：
 
-      1. 该班次下没有学生、没有成绩时，成功删除，返回列表
+      1. 该班次下没有学生、没有成绩时，弹出删除确认框，点击确认后，成功删除，返回列表
 
-      2. 该班次下有学生、有成绩时，返回 http500，API 层报出外键约束错误如下【问题】
-         INFO: 127.0.0.1:59522 - "DELETE /api/class/30034 HTTP/1.1" 500 Internal Server Error
-         ERROR: Exception in ASGI application
-         Traceback (most recent call last):
-         File "D:\PythonWorking\campus_MIS\cgms\Lib\site-packages\uvicorn\protocols\http\h11_impl.py", line 403, in run_asgi
-         result = await app( # type: ignore[func-returns-value]
-         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-         self.scope, self.receive, self.send
-         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-         )
-         ^
-         File "D:\PythonWorking\campus_MIS\cgms\Lib\site-packages\uvicorn\middleware\proxy_headers.py", line 60, in **call**
-         return await self.app(scope, receive, send)
-         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-         File "D:\PythonWorking\campus_MIS\cgms\Lib\site-packages\fastapi\applications.py", line 1054, in **call**
-         await super().**call**(scope, receive, send)
-         File "D:\PythonWorking\campus_MIS\cgms\Lib\site-packages\starlette\applications.py", line 112, in **call**
-         await self.middleware_stack(scope, receive, send)
-         File "D:\PythonWorking\campus_MIS\cgms\Lib\site-packages\starlette\middleware\errors.py", line 187, in **call**
-         raise exc
-         File "D:\PythonWorking\campus_MIS\cgms\Lib\site-packages\starlette\middleware\errors.py", line 165, in **call**
-         await self.app(scope, receive, \_send)
-         File "D:\PythonWorking\campus_MIS\cgms\Lib\site-packages\starlette\middleware\cors.py", line 93, in **call**
-         await self.simple_response(scope, receive, send, request_headers=headers)
-         File "D:\PythonWorking\campus_MIS\cgms\Lib\site-packages\starlette\middleware\cors.py", line 144, in simple_response
-         await self.app(scope, receive, send)
-         File "D:\PythonWorking\campus_MIS\cgms\Lib\site-packages\starlette\middleware\exceptions.py", line 62, in **call**
-         await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
-         File "D:\PythonWorking\campus_MIS\cgms\Lib\site-packages\starlette_exception_handler.py", line 53, in wrapped_app
-         raise exc
-         File "D:\PythonWorking\campus_MIS\cgms\Lib\site-packages\starlette_exception_handler.py", line 42, in wrapped_app
-         await app(scope, receive, sender)
-         File "D:\PythonWorking\campus_MIS\cgms\Lib\site-packages\starlette\routing.py", line 714, in **call**
-         await self.middleware_stack(scope, receive, send)
-         File "D:\PythonWorking\campus_MIS\cgms\Lib\site-packages\starlette\routing.py", line 734, in app
-         await route.handle(scope, receive, send)
-         File "D:\PythonWorking\campus_MIS\cgms\Lib\site-packages\starlette\routing.py", line 288, in handle
-         await self.app(scope, receive, send)
-         File "D:\PythonWorking\campus_MIS\cgms\Lib\site-packages\starlette\routing.py", line 76, in app
-         await wrap_app_handling_exceptions(app, request)(scope, receive, send)
-         File "D:\PythonWorking\campus_MIS\cgms\Lib\site-packages\starlette_exception_handler.py", line 53, in wrapped_app
-         raise exc
-         File "D:\PythonWorking\campus_MIS\cgms\Lib\site-packages\starlette_exception_handler.py", line 42, in wrapped_app
-         await app(scope, receive, sender)
-         File "D:\PythonWorking\campus_MIS\cgms\Lib\site-packages\starlette\routing.py", line 73, in app
-         response = await f(request)
-         ^^^^^^^^^^^^^^^^
-         File "D:\PythonWorking\campus_MIS\cgms\Lib\site-packages\fastapi\routing.py", line 301, in app
-         raw_response = await run_endpoint_function(
-         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-         ...<3 lines>...
-         )
-         ^
-         File "D:\PythonWorking\campus_MIS\cgms\Lib\site-packages\fastapi\routing.py", line 212, in run_endpoint_function
-         return await dependant.call(\*\*values)
-         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-         File "D:\WEB\cgms2025\appserv\serv\course_class.py", line 226, in delete_class
-         db.execute(
-
-         ```^
-             "DELETE FROM class WHERE sn=%(class_sn)s",
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-             {"class_sn": class_sn}
-             ^^^^^^^^^^^^^^^^^^^^^^
-         )
-         ^
-         File "D:\PythonWorking\campus_MIS\cgms\Lib\site-packages\psycopg\cursor.py", line 97, in execute
-         raise ex.with_traceback(None)
-         psycopg.errors.ForeignKeyViolation: 在 "class" 上的更新或删除操作违反了在 "class_student" 上的外键约束 "class_student_class_sn_fkey"
-         DETAIL:  键值对(sn)=(30034)仍然是从表"class_student"引用的.
-         ```
+      2. 该班次下有学生、有成绩时，直接输出 message.error
 
 ## 4.成绩
 
