@@ -1,6 +1,8 @@
 import { useRef, useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { fetcher } from "../utils";
+import { ExclamationCircleOutlined } from "@ant-design/icons";
+import { Table, InputNumber, Button, message, Modal, Alert } from "antd";
 import ClassStudentSelection from "./ClassStudentSelection";
 import GradeEntrySection from "./GradeEntrySection";
 import "./class.css";
@@ -274,19 +276,51 @@ function ClassDetail({ classinfo }) {
   const deleteAction = async () => {
     try {
       setBusy(true);
-      // 使用 fetcher 函数发送删除请求
-      const response = await fetcher(`/api/class/${classinfo.class_sn}`, {
-        method: "DELETE",
-      });
 
-      if (response === null || response.ok) {
-        navigate("/class/list");
+      // 检查是否存在关联学生
+      const linkedStudents = await fetcher(
+        `/api/class/${classinfo.class_sn}/students`
+      );
+      // 检查是否存在成绩记录
+      const grades = await fetcher(
+        `/api/class/${classinfo.class_sn}/students-with-grades`
+      );
+      console.log("grades:", grades);
+      if (linkedStudents?.length > 0 || grades?.length > 0) {
+        message.error("该班次下有学生或成绩记录，不能删除");
       } else {
-        console.error(response);
-        throw new Error("删除失败");
+        // 发送删除请求前给出确认提示
+        const confirmResult = await new Promise((resolve) => {
+          Modal.confirm({
+            title: "警告",
+            icon: <ExclamationCircleOutlined />,
+            content: "该操作不可逆，请谨慎确认，是否继续删除？",
+            okText: "确认删除",
+            cancelText: "取消",
+            onOk: () => resolve(true),
+            onCancel: () => resolve(false),
+          });
+        });
+
+        if (!confirmResult) {
+          return;
+        }
+
+        // 发送删除请求
+        const response = await fetcher(`/api/class/${classinfo.class_sn}`, {
+          method: "DELETE",
+        });
+
+        if (response === null || response.ok !== false) {
+          message.success("班次删除成功");
+          navigate("/class/list");
+        } else {
+          console.error(response);
+          throw new Error("删除失败");
+        }
       }
     } catch (error) {
-      console.error(error);
+      message.error(error.info?.detail || error.message);
       setActionError(error.info?.detail || error.message);
     } finally {
       setBusy(false);

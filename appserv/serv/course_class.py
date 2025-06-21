@@ -221,14 +221,45 @@ async def delete_class(
     class_sn: int,
     current_user: User = Depends(get_current_active_user)
 ):
-    validate_jiaomi_role(current_user.user_name)  # 新增角色校验
+    validate_jiaomi_role(current_user.user_name)
     with dblock() as db:
-        db.execute(
-            "DELETE FROM class WHERE sn=%(class_sn)s",
-            {"class_sn": class_sn}
-        )
-        if db.rowcount == 0:
-            raise HTTPException(404, "班次不存在")
+        try:
+            # 检查班次下是否有学生记录
+            db.execute(
+                "SELECT COUNT(*) AS student_count FROM class_student WHERE class_sn = %(class_sn)s",
+                {"class_sn": class_sn}
+            )
+            student_row = db.fetchone()
+            student_count = student_row.student_count if student_row else 0
+
+            # 检查班次下是否有成绩记录
+            db.execute(
+                "SELECT COUNT(*)  AS grade_count FROM class_grade WHERE class_sn = %(class_sn)s",
+                {"class_sn": class_sn}
+            )
+            grade_row = db.fetchone()
+            grade_count = grade_row.grade_count if grade_row else 0
+
+            if student_count > 0 or grade_count > 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="该班次下有学生或成绩记录，不能删除"
+                )
+            
+            db.execute(
+                "DELETE FROM class WHERE sn=%(class_sn)s",
+                {"class_sn": class_sn}
+            )
+            if db.rowcount == 0:
+                raise HTTPException(404, "班次不存在")
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"删除班次时发生错误: {str(e)}"
+            )          
 
 @router.patch("/api/class/{class_sn}", status_code=status.HTTP_200_OK)
 async def update_class_location(
