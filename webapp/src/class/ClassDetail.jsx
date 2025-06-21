@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { fetcher } from "../utils";
 import ClassStudentSelection from "./ClassStudentSelection";
 import GradeEntrySection from "./GradeEntrySection";
@@ -8,6 +8,7 @@ import "./class.css";
 function ClassDetail({ classinfo }) {
   const formRef = useRef();
   let navigate = useNavigate();
+  const location = useLocation();
 
   const isNew = classinfo.class_sn === null; //区分新增和编辑
   const [isDirty, setDirty] = useState(false);
@@ -44,13 +45,12 @@ function ClassDetail({ classinfo }) {
     if (!course) return;
 
     try {
-      const response = await fetch(
+      const response = await fetcher(
         `/api/class/sequence?cou_sn=${selectedCouSn}&year=${year}&semesterType=${semesterType}`
       );
-      const data = await response.json();
 
       // 自动生成班次号：课程号-当前年份-学期类型-序号（使用课程对象的 course_no）
-      const nextSeq = (data.max_sequence || 0) + (isNew ? 1 : 0); // 编辑时不增加序号
+      const nextSeq = (response.max_sequence || 0) + (isNew ? 1 : 0); // 编辑时不增加序号
       const classNo = `${course.course_no}-${year}S${semesterType}-${nextSeq
         .toString()
         .padStart(2, "0")}`;
@@ -71,6 +71,7 @@ function ClassDetail({ classinfo }) {
       setDirty(true);
     } catch (error) {
       console.error("生成班次信息失败:", error);
+      setActionError(error.info?.detail || error.message);
     }
   };
 
@@ -99,20 +100,16 @@ function ClassDetail({ classinfo }) {
       return;
     }
 
-    fetch("/api/course/list", {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    })
-      .then((res) => res.json())
-      .then((data) => {
+    const fetchCourseList = async () => {
+      try {
+        // 使用 fetcher 函数获取课程列表
+        const data = await fetcher("/api/course/list");
         setCourses(data);
         // 确保在数据加载后设置初始值
         if (!isNew) {
           setSelectedCouSn(classinfo.cou_sn);
         }
-      })
-      .catch((error) => {
+      } catch (error) {
         console.error("加载课程失败:", error);
         // 添加网络错误处理
         if (error.message.includes("Failed to fetch")) {
@@ -124,7 +121,10 @@ function ClassDetail({ classinfo }) {
           setActionError(`加载课程失败: ${error.message}`);
         }
         setCourses([]); // 确保设置为空数组
-      });
+      }
+    };
+
+    fetchCourseList();
 
     // 编辑模式下设置初始值
     if (!isNew) {
@@ -176,6 +176,7 @@ function ClassDetail({ classinfo }) {
 
     setDirty(hasChanged);
   };
+
   // 表单提交处理
   const saveAction = async () => {
     if (!localStorage.getItem("token")) {
@@ -225,30 +226,21 @@ function ClassDetail({ classinfo }) {
         method = "PATCH";
       }
 
-      const response = await fetch(url, {
+      const response = await fetcher(url, {
         method,
         headers: {
           "Content-Type": "application/json;charset=utf-8",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
         body: JSON.stringify(isNew ? data : { location: data.location }),
       });
 
-      console.log("classdetial", response);
+      console.log("classdetial response type:", typeof response);
+      console.log("classdetial response:", response);
 
-      if (!response.ok) {
-        // TODO:
-        const error = await response.json();
-        console.error("API Error:", error);
-        throw new Error(error.detail || "更新班次信息失败");
-      }
-
-      const class_data = await response.json();
+      const class_data = await response;
 
       // 修复点1：确保使用后端返回的class_sn
       const targetSn = isNew ? class_data.class_sn : classinfo.class_sn;
-
-      // 修复点2：添加参数有效性校验
       if (!targetSn) {
         throw new Error("未能获取有效的班次编号");
       }
@@ -267,26 +259,38 @@ function ClassDetail({ classinfo }) {
         replace: true, // 使用replace而不是push，避免历史记录问题
       });
     } catch (error) {
-      setActionError(error.message);
+      if (error.info && error.info.detail) {
+        setActionError(`请求失败: ${error.info.detail}`);
+      } else if (error.status) {
+        setActionError(`请求失败，状态码: ${error.status} ${error.message}`);
+      } else {
+        setActionError(`保存失败: ${error.message}`);
+      }
     } finally {
       setBusy(false);
     }
   };
 
   const deleteAction = async () => {
-    let response = await fetch(`/api/class/${classinfo.class_sn}`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`, // 添加认证头
-      },
-    });
+    try {
+      setBusy(true);
+      // 使用 fetcher 函数发送删除请求
+      const response = await fetcher(`/api/class/${classinfo.class_sn}`, {
+        method: "DELETE",
+      });
 
-    if (!response.ok) {
-      console.error(response);
-      return;
+      if (response === null || response.ok) {
+        navigate("/class/list");
+      } else {
+        console.error(response);
+        throw new Error("删除失败");
+      }
+    } catch (error) {
+      console.error(error);
+      setActionError(error.info?.detail || error.message);
+    } finally {
+      setBusy(false);
     }
-
-    navigate("/class/list");
   };
 
   return (
