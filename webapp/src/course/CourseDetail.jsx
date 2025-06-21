@@ -1,6 +1,18 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { fetcher } from "../utils";
+import { FormField } from "../components/StyledForm";
+import {
+  Paper,
+  PaperHead,
+  PaperBody,
+  PaperFooter,
+  StatusBar,
+  Message,
+  ErrorMessage,
+  ErrorButton,
+} from "../components/StyledPaper";
+import StyledButton from "../components/StyledButton";
 
 function CourseDetail({ courseinfo }) {
   const formRef = useRef(null);
@@ -98,9 +110,16 @@ function CourseDetail({ courseinfo }) {
 
   return (
     <>
-      <div className="paper-body">
+      <PaperHead>
+        <div className="head-actions">
+          <StyledButton onClick={() => navigate("/course/list")}>
+            返回列表
+          </StyledButton>
+        </div>
+      </PaperHead>
+      <PaperBody>
         <form ref={formRef}>
-          <div className="field">
+          <FormField>
             <label>课程编号: </label>
             <input
               type="text"
@@ -112,12 +131,12 @@ function CourseDetail({ courseinfo }) {
                 else setActionError(null);
               }}
             />
-          </div>
-          <div className="field">
+          </FormField>
+          <FormField>
             <label>课程名称: </label>
             <input type="text" name="course_name" onChange={checkChange} />
-          </div>
-          <div className="field">
+          </FormField>
+          <FormField>
             <label>学分: </label>
             <input
               type="number"
@@ -129,8 +148,8 @@ function CourseDetail({ courseinfo }) {
                 else setActionError(null);
               }}
             />
-          </div>
-          <div className="field">
+          </FormField>
+          <FormField>
             <label>学时: </label>
             <input
               type="number"
@@ -142,40 +161,28 @@ function CourseDetail({ courseinfo }) {
                 else setActionError(null);
               }}
             />
-          </div>
+          </FormField>
         </form>
-      </div>
-      <div className="paper-footer">
+      </PaperBody>
+      <PaperFooter>
         <div className="btns">
-          <button className="btn" onClick={deleteAction} disabled={isBusy}>
+          <StyledButton onClick={deleteAction} disabled={isBusy}>
             删除
-          </button>
-          <button
-            className="btn"
-            onClick={saveAction}
-            disabled={isBusy || !!actionError}
-          >
+          </StyledButton>
+          <StyledButton onClick={saveAction} disabled={isBusy || !!actionError}>
             保存
-          </button>
-          <button
-            className="btn"
-            onClick={() => {
-              navigate("/course/list");
-            }}
-          >
-            返回
-          </button>
+          </StyledButton>
         </div>
-      </div>
-      <div className="statusbar">
-        {isBusy && <div className="message">处理中，请稍后...</div>}
+      </PaperFooter>
+      <StatusBar>
+        {isBusy && <Message>处理中，请稍后...</Message>}
         {actionError && (
-          <div className="message error">
+          <ErrorMessage>
             <span>发生错误：{actionError}</span>
-            <button onClick={() => setActionError(null)}>X</button>
-          </div>
+            <ErrorButton onClick={() => setActionError(null)}>X</ErrorButton>
+          </ErrorMessage>
         )}
-      </div>
+      </StatusBar>
     </>
   );
 }

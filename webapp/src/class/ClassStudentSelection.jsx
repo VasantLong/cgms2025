@@ -5,7 +5,8 @@ import { fetcher } from "../utils";
 import { SearchBar } from "@components/SearchBar";
 import "./student-selection.css";
 import { message } from "antd";
-import StyledTable from "../components/StyledTable";
+import { StyledTable } from "../components/StyledTable";
+import StyledButton from "../components/StyledButton";
 import {
   Paper,
   PaperHead,
@@ -329,12 +330,12 @@ export default function ClassStudentSelection({ classinfo }) {
         <SearchBar placeholder="搜索学号或姓名..." onSearch={setSearchTerm} />
         <div className="selection-info">
           <span>已选: {selectedStudents.size}人</span>
-          <button
+          <StyledButton
             onClick={handleSubmit}
             disabled={!hasChanges || isSubmitting} // 无修改时禁用
           >
             {isSubmitting ? "提交中..." : "保存关联"}
-          </button>
+          </StyledButton>
         </div>
       </div>
 

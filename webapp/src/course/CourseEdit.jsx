@@ -2,6 +2,16 @@ import { useParams } from "react-router-dom";
 import CourseDetail from "./CourseDetail";
 import useSWR from "swr";
 import { fetcher } from "../utils";
+import { StyledTable } from "../components/StyledTable";
+import {
+  Paper,
+  PaperHead,
+  PaperBody,
+  StatusBar,
+  Message,
+  ErrorMessage,
+  ErrorButton,
+} from "../components/StyledPaper";
 
 function CourseEdit(props) {
   // 从URL参数中获取课程编号
@@ -16,29 +26,31 @@ function CourseEdit(props) {
 
   if (error) {
     return (
-      <div className="paper">
+      <Paper>
         <div>数据加载失败</div>
-      </div>
+      </Paper>
     );
   }
 
   if (!courseinfo) {
     return (
-      <div className="paper">
+      <Paper>
         <div>数据加载中...</div>
-      </div>
+      </Paper>
     );
   }
 
   return (
-    <div className="paper">
-      <div className="paper-head">
+    <Paper>
+      <PaperHead>
         <h3>
           {`课程信息：${courseinfo.course_name} (#${courseinfo.course_sn})`}
         </h3>
-      </div>
-      <CourseDetail courseinfo={courseinfo} />
-    </div>
+      </PaperHead>
+      <PaperBody>
+        <CourseDetail courseinfo={courseinfo} />
+      </PaperBody>
+    </Paper>
   );
 }
 export default CourseEdit;

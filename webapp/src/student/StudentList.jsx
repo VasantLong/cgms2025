@@ -20,7 +20,6 @@ function StudentList(props) {
     <Paper>
       <PaperHead>
         <StyledButton
-          className="btn"
           onClick={() => {
             navigate("/student/new");
           }}

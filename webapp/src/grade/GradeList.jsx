@@ -5,6 +5,16 @@ import useSWR from "swr";
 import GradeTable from "./GradeTable";
 import { fetcher } from "../utils";
 import "./grade.css";
+import { StyledTable } from "../components/StyledTable";
+import {
+  Paper,
+  PaperHead,
+  PaperBody,
+  StatusBar,
+  Message,
+  ErrorMessage,
+  ErrorButton,
+} from "../components/StyledPaper";
 
 function GradeList(props) {
   let navigate = useNavigate();
@@ -142,14 +152,14 @@ function GradeList(props) {
   };
 
   return (
-    <div className="paper">
+    <Paper>
       <h2>成绩查询</h2>
-      <div className="paper-body">
+      <PaperBody>
         <GradeQueryForm />
-      </div>
+      </PaperBody>
       {/* 保留原有调试信息 */}
       {props.debug && <pre>{JSON.stringify(grades, null, 2)}</pre>}
-    </div>
+    </Paper>
   );
 }
 

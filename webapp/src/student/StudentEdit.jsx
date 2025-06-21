@@ -2,6 +2,7 @@ import { useParams } from "react-router-dom";
 import StudentDetail from "./StudentDetail";
 import useSWR from "swr";
 import { fetcher } from "../utils";
+import { Paper } from "../components/StyledPaper";
 
 function StudentEdit(props) {
   const { stuSn } = useParams();
@@ -13,24 +14,24 @@ function StudentEdit(props) {
 
   if (error) {
     return (
-      <div className="paper">
+      <Paper>
         <div>数据加载失败</div>
-      </div>
+      </Paper>
     );
   }
 
   if (!stuinfo) {
     return (
-      <div className="paper">
+      <Paper>
         <div>数据加载中...</div>
-      </div>
+      </Paper>
     );
   }
 
   return (
-    <div className="paper">
+    <Paper>
       <StudentDetail stuinfo={stuinfo} />
-    </div>
+    </Paper>
   );
 }
 

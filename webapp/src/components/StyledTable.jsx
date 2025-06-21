@@ -1,10 +1,16 @@
 import styled from "styled-components";
 
 // 定义 Table 组件
-const StyledTable = styled.table`
+export const StyledTable = styled.table`
   width: 100%;
   border-collapse: collapse;
   text-align: center;
+  margin: ${({ theme }) => theme.spacing.md} 0 & th {
+    background-color: ${({ theme }) => theme.colors.primary};
+    color: white;
+    padding: ${({ theme }) => theme.spacing.sm}
+      ${({ theme }) => theme.spacing.md};
+  }
 
   th,
   td {
@@ -33,5 +39,3 @@ const StyledTable = styled.table`
     background-color: hsl(306, 40%, 90%);
   }
 `;
-
-export default StyledTable;

@@ -2,7 +2,7 @@ import useSWR from "swr";
 import { fetcher } from "../utils";
 import { Link } from "react-router-dom";
 import "./grade.css";
-import StyledTable from "../components/StyledTable";
+import { StyledTable } from "../components/StyledTable";
 
 function GradeTable({ items: externalItems }) {
   // 优先使用外部传入数据，无数据时保持独立请求能力

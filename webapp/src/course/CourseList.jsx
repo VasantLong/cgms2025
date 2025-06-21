@@ -1,7 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import CourseTable from "./CourseTable";
 import StyledButton from "../components/StyledButton";
-import StyledTable from "../components/StyledTable";
 import {
   Paper,
   PaperHead,

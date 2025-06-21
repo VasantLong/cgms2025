@@ -5,11 +5,13 @@ import "./student.css";
 import useSWR from "swr";
 import React, { useState } from "react";
 import { Table, Pagination } from "antd";
-import StyledTable from "../components/StyledTable";
+import StyledButton from "../components/StyledButton";
+import { StyledTable } from "../components/StyledTable";
 import {
   Paper,
   PaperHead,
   PaperBody,
+  PaperFooter,
   StatusBar,
   Message,
   ErrorMessage,
@@ -24,7 +26,7 @@ function formatGender(v) {
 
 function StudentTable(props) {
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(10);
 
   const { data, error } = useSWR(
     `/api/student/list?page=${currentPage}&page_size=${pageSize}`,
@@ -94,12 +96,12 @@ function StudentTable(props) {
       </StyledTable>
 
       <div className="pagination">
-        <button
+        <StyledButton
           onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
           disabled={currentPage === 1}
         >
           上一页
-        </button>
+        </StyledButton>
         <span>
           第 {currentPage} 页，共 {totalPages} 页
         </span>
@@ -111,14 +113,14 @@ function StudentTable(props) {
           <option value="20">20</option>
           <option value="50">50</option>
         </select>
-        <button
+        <StyledButton
           onClick={() =>
             handlePageChange(Math.min(totalPages, currentPage + 1))
           }
           disabled={currentPage === totalPages}
         >
           下一页
-        </button>
+        </StyledButton>
       </div>
     </PaperBody>
   );

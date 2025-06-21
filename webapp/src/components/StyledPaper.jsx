@@ -1,5 +1,5 @@
 import styled from "styled-components";
-import StyledTable from "./StyledTable";
+import { StyledTable } from "./StyledTable";
 
 // 定义 Paper 组件
 const Paper = styled.div`
@@ -31,6 +31,11 @@ const PaperBody = styled.div`
   > ${StyledTable} {
     width: 100%;
   }
+`;
+
+const PaperFooter = styled.div`
+  min-height: 2rem;
+  margin-top: 5px;
 `;
 
 // 定义 StatusBar 组件
@@ -72,6 +77,7 @@ export {
   Paper,
   PaperHead,
   PaperBody,
+  PaperFooter,
   StatusBar,
   Message,
   ErrorMessage,

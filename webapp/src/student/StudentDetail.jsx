@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import StyledButton from "../components/StyledButton";
+import { FormField } from "../components/StyledForm";
 import {
   Tabs,
   Descriptions,
@@ -264,7 +266,9 @@ function StudentDetail({ stuinfo }) {
       <PaperHead>
         <h2>{isNew ? "新建学生档案" : `学生详情：${stuinfo.stu_name}`}</h2>
         <div className="head-actions">
-          <Button onClick={() => navigate("/student/list")}>返回列表</Button>
+          <StyledButton onClick={() => navigate("/student/list")}>
+            返回列表
+          </StyledButton>
         </div>
       </PaperHead>
 
@@ -276,19 +280,21 @@ function StudentDetail({ stuinfo }) {
         >
           基本信息
         </button>
-        <button
-          className={`tab ${activeTab === "report" ? "active" : ""}`}
-          onClick={() => setActiveTab("report")}
-        >
-          成绩档案
-        </button>
+        {!isNew && (
+          <button
+            className={`tab ${activeTab === "report" ? "active" : ""}`}
+            onClick={() => setActiveTab("report")}
+          >
+            成绩档案
+          </button>
+        )}
       </div>
 
       {/* 标签页内容 */}
       {activeTab === "basic" && (
         <PaperBody>
           <form ref={formRef}>
-            <div className="field">
+            <FormField>
               <label>学号: </label>
               <input
                 type="text"
@@ -296,8 +302,8 @@ function StudentDetail({ stuinfo }) {
                 onChange={checkChange}
                 disabled={!isNew} // 仅新增模式可编辑
               />
-            </div>
-            <div className="field">
+            </FormField>
+            <FormField>
               <label>姓名: </label>
               <input
                 type="text"
@@ -305,8 +311,8 @@ function StudentDetail({ stuinfo }) {
                 onChange={checkChange}
                 disabled={!isNew}
               />
-            </div>
-            <div className="field">
+            </FormField>
+            <FormField>
               <label>性别: </label>
               <div className="radio-choices">
                 <span className="option">
@@ -330,8 +336,8 @@ function StudentDetail({ stuinfo }) {
                   />
                 </span>
               </div>
-            </div>
-            <div className="field">
+            </FormField>
+            <FormField>
               <label>入学时间: </label>
               <input
                 type="date"
@@ -339,42 +345,39 @@ function StudentDetail({ stuinfo }) {
                 onChange={checkChange}
                 disabled={!isNew} // 仅新增模式可编辑
               />
-            </div>
+            </FormField>
+            <FormField>
+              <label>专业: </label>
+              <input
+                type="text"
+                name="major"
+                onChange={checkChange}
+                disabled={!isNew}
+              />
+            </FormField>
           </form>
-          <PaperFooter>
+          <div className="paper-footer">
             <div className="btns">
-              <button className="btn" onClick={deleteAction} disabled={isBusy}>
+              <StyledButton onClick={deleteAction} disabled={isBusy}>
                 删除
-              </button>
-              <button
-                className="btn"
-                onClick={saveAction}
-                disabled={isBusy || !isDirty}
-              >
+              </StyledButton>
+              <StyledButton onClick={saveAction} disabled={isBusy || !isDirty}>
                 保存
-              </button>
-              <button
-                className="btn"
-                onClick={() => {
-                  navigate("/student/list");
-                }}
-              >
-                返回
-              </button>
+              </StyledButton>
             </div>
-          </PaperFooter>
+          </div>
         </PaperBody>
       )}
-      {activeTab === "report" && (
+      {!isNew && activeTab === "report" && (
         <PaperBody>
           <div className="full-tab-container">
             <div className="action-bar">
-              <Button type="primary" onClick={() => handleExport("xlsx")}>
+              <StyledButton type="primary" onClick={() => handleExport("xlsx")}>
                 导出Excel
-              </Button>
-              <Button type="primary" onClick={() => handleExport("pdf")}>
+              </StyledButton>
+              <StyledButton type="primary" onClick={() => handleExport("pdf")}>
                 导出PDF
-              </Button>
+              </StyledButton>
               <span className="stats-summary">
                 总学分：{data?.stats.total_credits || 0}| 平均成绩：
                 {data?.stats.gpa?.toFixed(2) || "N/A"}
@@ -417,19 +420,6 @@ function StudentDetail({ stuinfo }) {
               ]}
               scroll={{ x: 800 }}
             />
-          </div>
-
-          <div className="paper-footer">
-            <div className="btns">
-              <button
-                className="btn"
-                onClick={() => {
-                  navigate("/student/list");
-                }}
-              >
-                返回
-              </button>
-            </div>
           </div>
         </PaperBody>
       )}

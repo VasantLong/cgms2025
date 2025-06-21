@@ -1,16 +1,18 @@
 import { useRef, useEffect, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Form } from "react-router-dom";
 import { fetcher } from "../utils";
 import { ExclamationCircleOutlined } from "@ant-design/icons";
 import { Table, InputNumber, Button, message, Modal, Alert } from "antd";
 import ClassStudentSelection from "./ClassStudentSelection";
 import GradeEntrySection from "./GradeEntrySection";
 import "./class.css";
-import StyledTable from "../components/StyledTable";
+import StyledButton from "../components/StyledButton";
+import { FormField } from "../components/StyledForm";
 import {
   Paper,
   PaperHead,
   PaperBody,
+  PaperFooter,
   StatusBar,
   Message,
   ErrorMessage,
@@ -340,9 +342,14 @@ function ClassDetail({ classinfo }) {
   return (
     <>
       {/* 头部班次信息 */}
-      <div className="paper-head">
+      <PaperHead>
         <h2>{isNew ? "新建班次" : `班次详情：${classinfo.name}`}</h2>
-      </div>
+        <div className="head-actions">
+          <StyledButton onClick={() => navigate("/student/list")}>
+            返回列表
+          </StyledButton>
+        </div>
+      </PaperHead>
 
       {/* 选项卡导航 */}
       <div className="tabs">
@@ -373,9 +380,9 @@ function ClassDetail({ classinfo }) {
       {/* 选项卡内容 */}
       {activeTab === "basic" && (
         <>
-          <div className="paper-body">
+          <PaperBody>
             <form ref={formRef} onChange={checkChange}>
-              <div className="field">
+              <FormField>
                 <label>关联课程：</label>
                 <select
                   name="cou_sn"
@@ -392,9 +399,9 @@ function ClassDetail({ classinfo }) {
                     </option>
                   ))}
                 </select>
-              </div>
+              </FormField>
 
-              <div className="field">
+              <FormField>
                 <label>起始学年：</label>
                 <select
                   value={year}
@@ -414,9 +421,9 @@ function ClassDetail({ classinfo }) {
                     </option>
                   ))}
                 </select>
-              </div>
+              </FormField>
 
-              <div className="field">
+              <FormField>
                 <label>学期类型：</label>
                 <select
                   value={semesterType}
@@ -430,9 +437,9 @@ function ClassDetail({ classinfo }) {
                   <option value="1">秋季学期</option>
                   <option value="2">春季学期</option>
                 </select>
-              </div>
+              </FormField>
 
-              <div className="field">
+              <FormField>
                 <label>班次名称：</label>
                 <div className="generated-value">
                   <span>{generatedValues.name}</span>
@@ -442,9 +449,9 @@ function ClassDetail({ classinfo }) {
                     value={generatedValues.name}
                   />
                 </div>
-              </div>
+              </FormField>
 
-              <div className="field">
+              <FormField>
                 <label>班次号：</label>
                 <div className="generated-value">
                   <span>{generatedValues.class_no}</span>
@@ -454,9 +461,9 @@ function ClassDetail({ classinfo }) {
                     value={generatedValues.class_no}
                   />
                 </div>
-              </div>
+              </FormField>
 
-              <div className="field">
+              <FormField>
                 <label>学期：</label>
                 <div className="generated-value">
                   <span>{generatedValues.semester}</span>
@@ -466,9 +473,9 @@ function ClassDetail({ classinfo }) {
                     value={generatedValues.semester}
                   />
                 </div>
-              </div>
+              </FormField>
 
-              <div className="field">
+              <FormField>
                 <label>地点：</label>
                 <input
                   type="text"
@@ -476,84 +483,44 @@ function ClassDetail({ classinfo }) {
                   defaultValue={classinfo?.location || ""}
                   onChange={checkChange}
                 />
-              </div>
+              </FormField>
             </form>
-          </div>
+          </PaperBody>
 
-          <div className="paper-footer">
+          <PaperFooter>
             <div className="btns">
-              <button className="btn" onClick={deleteAction} disabled={isBusy}>
+              <StyledButton onClick={deleteAction} disabled={isBusy}>
                 删除
-              </button>
-              <button
-                className="btn"
-                onClick={saveAction}
-                disabled={isBusy || !isDirty}
-              >
+              </StyledButton>
+              <StyledButton onClick={saveAction} disabled={isBusy || !isDirty}>
                 保存
-              </button>
-              <button
-                className="btn"
-                onClick={() => {
-                  navigate("/class/list");
-                }}
-              >
-                返回
-              </button>
+              </StyledButton>
             </div>
-          </div>
+          </PaperFooter>
         </>
       )}
 
       {activeTab === "students" && (
-        <>
-          <div className="full-tab-container">
-            <ClassStudentSelection classinfo={classinfo} />
-          </div>
-          <div className="paper-footer">
-            <div className="btns">
-              <button
-                className="btn"
-                onClick={() => {
-                  navigate("/class/list");
-                }}
-              >
-                返回
-              </button>
-            </div>
-          </div>
-        </>
+        <div className="full-tab-container">
+          <ClassStudentSelection classinfo={classinfo} />
+        </div>
       )}
 
       {activeTab === "grades" && (
-        <>
-          <div className="paper-body">
-            <GradeEntrySection classinfo={classinfo} />
-          </div>
-          <div className="paper-footer">
-            <div className="btns">
-              <button
-                className="btn"
-                onClick={() => {
-                  navigate("/class/list");
-                }}
-              >
-                返回
-              </button>
-            </div>
-          </div>
-        </>
+        <PaperBody>
+          <GradeEntrySection classinfo={classinfo} />
+        </PaperBody>
       )}
 
-      <div className="statusbar">
-        {isBusy && <div className="message">处理中，请稍后...</div>}
+      <StatusBar>
+        {isBusy && <Message>处理中，请稍后...</Message>}
         {actionError && (
-          <div className="message error">
+          <ErrorMessage>
             <span>发生错误：{actionError}</span>
-            <button onClick={() => setActionError(null)}>X</button>
-          </div>
+            <ErrorButton onClick={() => setActionError(null)}>X</ErrorButton>
+          </ErrorMessage>
         )}
-      </div>
+      </StatusBar>
     </>
   );
 }
