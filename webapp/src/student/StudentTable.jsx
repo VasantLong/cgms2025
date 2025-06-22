@@ -1,7 +1,6 @@
 import useSWRInfinite from "swr/infinite";
 import { fetcher } from "../utils";
 import { Link } from "react-router-dom";
-import "./student.css";
 import useSWR from "swr";
 import React, { useState } from "react";
 import StyledButton from "../components/StyledButton";
@@ -18,8 +17,7 @@ import {
 } from "../components/StyledPaper";
 import {
   PaginationContainer,
-  PaginationButton,
-  PaginationSelect,
+  StyledAntPagination,
 } from "../components/StyledComponents";
 
 function formatGender(v) {
@@ -40,18 +38,16 @@ function StudentTable(props) {
   const items = data && Array.isArray(data.data) ? data.data : [];
   const total = data ? data.total : 0;
 
-  // 计算当前页显示的数据
-  const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-  const currentItems = items.slice(startIndex, endIndex);
-
-  const handlePageChange = (page) => {
+  const handlePageChange = (page, size) => {
     setCurrentPage(page);
+    if (size !== pageSize) {
+      setPageSize(size);
+    }
   };
 
-  const handlePageSizeChange = (size) => {
+  const handlePageSizeChange = (current, size) => {
+    setCurrentPage(current);
     setPageSize(size);
-    setCurrentPage(1); // 切换每页数量时，重置到第一页
   };
 
   if (error) {
@@ -66,9 +62,6 @@ function StudentTable(props) {
   if (!data) {
     return <div>数据加载中...</div>;
   }
-
-  // 计算总页数
-  const totalPages = Math.ceil(total / pageSize);
 
   return (
     <PaperBody>
@@ -97,33 +90,17 @@ function StudentTable(props) {
             ))}
         </tbody>
       </StyledTable>
-
       <PaginationContainer>
-        <PaginationButton
-          onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-          disabled={currentPage === 1}
-        >
-          上一页
-        </PaginationButton>
-        <span>
-          第 {currentPage} 页，共 {totalPages} 页
-        </span>
-        <PaginationSelect
-          value={pageSize}
-          onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-        >
-          <option value="10">10</option>
-          <option value="20">20</option>
-          <option value="50">50</option>
-        </PaginationSelect>
-        <PaginationButton
-          onClick={() =>
-            handlePageChange(Math.min(totalPages, currentPage + 1))
-          }
-          disabled={currentPage === totalPages}
-        >
-          下一页
-        </PaginationButton>
+        <StyledAntPagination
+          current={currentPage}
+          pageSize={pageSize}
+          defaultPageSize={10}
+          total={total}
+          onChange={handlePageChange}
+          onShowSizeChange={handlePageSizeChange}
+          showSizeChanger
+          pageSizeOptions={["10", "20", "50"]}
+        />
       </PaginationContainer>
     </PaperBody>
   );

@@ -23,13 +23,12 @@ import {
 import {
   Tabs,
   Tab,
-  GeneratedValue,
-  SelectionToolbar,
+  ActionBar,
+  StatsSummary,
 } from "../components/StyledComponents";
 import { fetcher } from "../utils";
 import useSWR, { mutate } from "swr";
 import { useSWRConfig } from "swr";
-import "./student.css";
 
 function StudentDetail({ stuinfo }) {
   const [activeTab, setActiveTab] = useState("basic");
@@ -376,18 +375,18 @@ function StudentDetail({ stuinfo }) {
       {!isNew && activeTab === "report" && (
         <PaperBody>
           <div className="full-tab-container">
-            <div className="action-bar">
+            <ActionBar>
               <StyledButton type="primary" onClick={() => handleExport("xlsx")}>
                 导出Excel
               </StyledButton>
               <StyledButton type="primary" onClick={() => handleExport("pdf")}>
                 导出PDF
               </StyledButton>
-              <span className="stats-summary">
+              <StatsSummary>
                 总学分：{data?.stats.total_credits || 0}| 平均成绩：
                 {data?.stats.gpa?.toFixed(2) || "N/A"}
-              </span>
-            </div>
+              </StatsSummary>
+            </ActionBar>
 
             {/* 带分页的表格 */}
             <Table

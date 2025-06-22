@@ -5,7 +5,6 @@ import { Select, Input, Pagination } from "antd";
 import useSWR, { mutate } from "swr";
 import GradeTable from "./GradeTable";
 import { fetcher } from "../utils";
-import { StyledTable } from "../components/StyledTable";
 import {
   Paper,
   PaperHead,
@@ -15,6 +14,10 @@ import {
   ErrorMessage,
   ErrorButton,
 } from "../components/StyledPaper";
+import {
+  PaginationContainer,
+  StyledAntPagination,
+} from "../components/StyledComponents";
 
 function GradeList(props) {
   let navigate = useNavigate();
@@ -178,24 +181,21 @@ function GradeList(props) {
             style={{ margin: "12px 0", color: "#666" }}
           >
             共查询到 {gradeItems.length} 条成绩
-            {params.class_sn && `（班次：${params.class_sn}）`}
-            {params.semester && `（学期：${params.semester}）`}
           </div>
         )}
 
         <GradeTable items={gradeItems} />
 
-        <div style={{ marginTop: 16, textAlign: "right" }}>
-          <Pagination
+        <PaginationContainer>
+          <StyledAntPagination
             current={currentPage}
             pageSize={pageSize}
             total={total}
             onChange={handlePageChange}
             showSizeChanger
             onShowSizeChange={handlePageChange}
-            style={{ marginTop: 16 }}
           />
-        </div>
+        </PaginationContainer>
       </div>
     );
   };

@@ -118,7 +118,7 @@ function ClassDetail({ classinfo }) {
       try {
         // 使用 fetcher 函数获取课程列表
         const data = await fetcher("/api/course/list");
-        setCourses(data);
+        setCourses(Array.isArray(data) ? data : []);
         // 确保在数据加载后设置初始值
         if (!isNew) {
           setSelectedCouSn(classinfo.cou_sn);

@@ -3,20 +3,14 @@ import { fetcher } from "../utils";
 import { Link } from "react-router-dom";
 import { StyledTable } from "../components/StyledTable";
 import {
-  Paper,
-  PaperHead,
-  PaperBody,
-  StatusBar,
-  Message,
-  ErrorMessage,
-  ErrorButton,
-} from "../components/StyledPaper";
+  PaginationContainer,
+  StyledAntPagination,
+} from "../components/StyledComponents";
 import { useState } from "react";
-import { Pagination } from "antd";
 
 const ClassTable = (props) => {
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(10);
 
   const { data, error } = useSWR(
     `/api/class/list?page=${currentPage}&page_size=${pageSize}`,
@@ -33,7 +27,9 @@ const ClassTable = (props) => {
 
   const handlePageChange = (page, size) => {
     setCurrentPage(page);
-    setPageSize(size);
+    if (size !== pageSize) {
+      setPageSize(size);
+    }
   };
   if (error) {
     return <div>数据加载失败</div>;
@@ -67,14 +63,17 @@ const ClassTable = (props) => {
           ))}
         </tbody>
       </StyledTable>
-      <Pagination
-        current={currentPage}
-        pageSize={pageSize}
-        total={total}
-        onChange={handlePageChange}
-        showSizeChanger
-        pageSizeOptions={["10", "20", "50"]}
-      />
+      <PaginationContainer>
+        <StyledAntPagination
+          current={currentPage}
+          pageSize={pageSize}
+          defaultPageSize={10}
+          total={total}
+          onChange={handlePageChange}
+          showSizeChanger
+          pageSizeOptions={["10", "20", "50"]}
+        />
+      </PaginationContainer>
     </>
   );
 };

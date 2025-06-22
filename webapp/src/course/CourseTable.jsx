@@ -2,12 +2,15 @@ import useSWR from "swr";
 import { fetcher } from "../utils";
 import { Link } from "react-router-dom";
 import { StyledTable } from "../components/StyledTable";
-import { Pagination } from "antd";
 import React, { useState } from "react";
+import {
+  PaginationContainer,
+  StyledAntPagination,
+} from "../components/StyledComponents";
 
 function CourseTable(props) {
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(10);
   const { data, error } = useSWR(
     `/api/course/list?page=${currentPage}&page_size=${pageSize}`,
     fetcher
@@ -53,14 +56,17 @@ function CourseTable(props) {
           ))}
         </tbody>
       </StyledTable>
-      <Pagination
-        current={currentPage}
-        pageSize={pageSize}
-        total={total}
-        onChange={handlePageChange}
-        showSizeChanger
-        pageSizeOptions={["10", "20", "50"]}
-      />
+      <PaginationContainer>
+        <StyledAntPagination
+          current={currentPage}
+          pageSize={pageSize}
+          defaultPageSize={10}
+          total={total}
+          onChange={handlePageChange}
+          showSizeChanger
+          pageSizeOptions={["10", "20", "50"]}
+        />
+      </PaginationContainer>
     </>
   );
 }

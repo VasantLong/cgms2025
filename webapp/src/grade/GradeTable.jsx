@@ -3,7 +3,6 @@ import { fetcher } from "../utils";
 import { Link } from "react-router-dom";
 import { StyledTable } from "../components/StyledTable";
 import { useState } from "react";
-import { Pagination } from "antd";
 
 function GradeTable({ items }) {
   if (!items) {

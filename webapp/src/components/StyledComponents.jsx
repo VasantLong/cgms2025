@@ -1,4 +1,6 @@
 import styled from "styled-components";
+import { Pagination as AntPagination } from "antd";
+console.log(AntPagination); // 打印 AntPagination 查看其结构
 
 // 从 StyledStudentSelection 移入的组件
 export const StudentSelection = styled.div`
@@ -153,8 +155,123 @@ export const PaginationSelect = styled.select`
   &:focus {
     outline: none;
     border-color: hsl(329, 45%, 38%);
-    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+    box-shadow: 0 0 0 2px hsla(329, 45%, 38%, 0.2); // 使用相同颜色并设置透明度
   }
 `;
 
-// ... 已有代码 ...
+export const StyledAntPagination = styled(AntPagination)`
+  .ant-pagination-item {
+    ${PaginationButton}
+    background: white;
+    border: 1px solid #d9d9d9;
+    &:hover {
+      color: hsl(329, 45%, 38%);
+      border-color: hsl(329, 45%, 38%);
+      background: white;
+    }
+    &.ant-pagination-item-active {
+      border-color: hsl(329, 45%, 38%);
+      color: hsl(329, 45%, 38%);
+      font-weight: 500;
+
+      a {
+        color: hsl(329, 45%, 38%);
+      }
+    }
+  }
+
+  .ant-pagination-prev,
+  .ant-pagination-next {
+    ${PaginationButton}
+    background: white;
+    border: 1px solid #d9d9d9;
+    &:hover {
+      color: hsl(329, 45%, 38%);
+      border-color: hsl(329, 45%, 38%);
+      background: white;
+    }
+    &.ant-pagination-disabled {
+      color: rgba(0, 0, 0, 0.25);
+      border-color: #d9d9d9;
+      background-color: #f5f5f5;
+      cursor: not-allowed;
+    }
+  }
+
+  .ant-pagination-options-size-changer {
+    ${PaginationSelect}
+    .ant-select-selector {
+      border-color: hsl(329, 45%, 38%) !important; // 设置选择框边框颜色
+    }
+    // 聚焦时的边框和阴影
+    &.ant-select-focused .ant-select-selector {
+      border-color: hsl(329, 45%, 38%) !important;
+      box-shadow: 0 0 0 2px hsla(329, 45%, 38%, 0.2) !important; // 使用相同颜色并设置透明度
+    }
+
+    // 下拉菜单选项选中时的背景颜色，参考原生的透明度
+    .ant-select-dropdown
+      .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+      background-color: hsla(329, 45%, 38%, 0.1); // 设置较低的透明度
+      color: hsl(329, 45%, 38%);
+    }
+
+    // 下拉菜单选项 hover 时的背景颜色
+    .ant-select-dropdown
+      .ant-select-item-option-active:not(.ant-select-item-option-disabled) {
+      background-color: hsla(329, 45%, 38%, 0.06); // 设置更低的透明度
+    }
+
+    // 页数选择按钮 hover 时的样式
+    &:hover .ant-select-selector {
+      border-color: hsl(329, 45%, 38%) !important;
+      box-shadow: 0 0 0 2px hsla(329, 45%, 38%, 0.2) !important;
+    }
+  }
+`;
+
+// 新增选项卡样式
+export const StatsHeader = styled.div`
+  display: flex;
+  gap: 20px;
+  margin-bottom: 15px;
+  padding: 10px;
+  background: #f5f5f5;
+  border-radius: 4px;
+`;
+
+// 统计卡片布局
+export const StatsCards = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+`;
+
+// 表格样式
+export const GrayText = styled.span`
+  color: #999;
+`;
+
+// 导出按钮组
+export const ExportButtons = styled.div`
+  margin-bottom: 16px;
+  display: flex;
+  gap: 8px;
+`;
+
+export const ActionBar = styled.div`
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 16px;
+`;
+
+export const StatsSummary = styled.div`
+  color: #666;
+  line-height: 32px;
+  padding: 0 12px;
+`;
+
+export const Muted = styled.span`
+  color: #999;
+`;
