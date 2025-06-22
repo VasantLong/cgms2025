@@ -1,4 +1,5 @@
 import { useState } from "react";
+import StyledButton from "./StyledButton";
 
 export function SearchBar({ placeholder, onSearch }) {
   const [input, setInput] = useState("");
@@ -16,7 +17,7 @@ export function SearchBar({ placeholder, onSearch }) {
         value={input}
         onChange={(e) => setInput(e.target.value)}
       />
-      <button type="submit">搜索</button>
+      <StyledButton type="submit">搜索</StyledButton>
     </form>
   );
 }

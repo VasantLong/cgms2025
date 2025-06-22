@@ -1,8 +1,24 @@
 import useSWRInfinite from "swr/infinite";
 import { fetcher } from "../utils";
 import { Link } from "react-router-dom";
-import "./student.css";
-import { Pagination } from "@components/Pagination";
+import useSWR from "swr";
+import React, { useState } from "react";
+import StyledButton from "../components/StyledButton";
+import { StyledTable } from "../components/StyledTable";
+import {
+  Paper,
+  PaperHead,
+  PaperBody,
+  PaperFooter,
+  StatusBar,
+  Message,
+  ErrorMessage,
+  ErrorButton,
+} from "../components/StyledPaper";
+import {
+  PaginationContainer,
+  StyledAntPagination,
+} from "../components/StyledComponents";
 
 function formatGender(v) {
   if (v === "M") return "男";
@@ -11,30 +27,36 @@ function formatGender(v) {
 }
 
 function StudentTable(props) {
-  const getKey = (pageIndex, previousPageData) => {
-    // 已经到达末尾
-    if (previousPageData && !previousPageData.length) return null;
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-    // 第一页不使用游标
-    if (pageIndex === 0) return "/api/student/list?page_size=20";
+  const { data, error } = useSWR(
+    `/api/student/list?page=${currentPage}&page_size=${pageSize}`,
+    fetcher
+  );
 
-    // 后续页使用最后一条记录的stu_sn作为游标
-    const lastSn = previousPageData[previousPageData.length - 1].stu_sn;
-    return `/api/student/list?last_sn=${lastSn}&page_size=20`;
+  const items = data && Array.isArray(data.data) ? data.data : [];
+  const total = data ? data.total : 0;
+
+  const handlePageChange = (page, size) => {
+    setCurrentPage(page);
+    if (size !== pageSize) {
+      setPageSize(size);
+    }
   };
 
-  const { data, size, setSize, isValidating, error } = useSWRInfinite(
-    getKey,
-    fetcher,
-    {
-      revalidateFirstPage: false, // 防止第一页重复加载
-    }
-  );
-  // 合并所有页数据
-  const items = data ? data.flat() : [];
+  const handlePageSizeChange = (current, size) => {
+    setCurrentPage(current);
+    setPageSize(size);
+  };
 
   if (error) {
-    return <div>数据加载失败</div>;
+    return (
+      <>
+        <div>数据加载失败</div>
+        <ErrorButton onClick={() => window.location.reload()}>×</ErrorButton>
+      </>
+    );
   }
 
   if (!data) {
@@ -42,8 +64,8 @@ function StudentTable(props) {
   }
 
   return (
-    <div className="student-table-container">
-      <table className="table">
+    <PaperBody>
+      <StyledTable>
         <thead>
           <tr>
             <th className="col-stu_name">姓名</th>
@@ -67,14 +89,20 @@ function StudentTable(props) {
               </tr>
             ))}
         </tbody>
-      </table>
-
-      <Pagination
-        isLoading={isValidating}
-        onLoadMore={() => setSize(size + 1)}
-        hasMore={data && data[data.length - 1]?.length === 20}
-      />
-    </div>
+      </StyledTable>
+      <PaginationContainer>
+        <StyledAntPagination
+          current={currentPage}
+          pageSize={pageSize}
+          defaultPageSize={10}
+          total={total}
+          onChange={handlePageChange}
+          onShowSizeChange={handlePageSizeChange}
+          showSizeChanger
+          pageSizeOptions={["10", "20", "50"]}
+        />
+      </PaginationContainer>
+    </PaperBody>
   );
 }
 

@@ -10,11 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ant-design/icons": "^6.0.0",
     "antd": "^5.26.0",
     "cors": "^2.8.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.23.1",
+    "styled-components": "^6.1.19",
     "swr": "^2.3.3",
     "xlsx": "^0.18.5"
   },

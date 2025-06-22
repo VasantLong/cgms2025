@@ -1,7 +1,13 @@
 import { Table, InputNumber, Button, message, Modal, Alert } from "antd";
 import { useState, useEffect, useRef } from "react";
 import { fetcher } from "../utils";
-import "./grade-entry.css";
+import {
+  GradeEntryContainer,
+  GradeToolbar,
+  GradeCount,
+  GradeTable,
+  CustomButton,
+} from "../components/StyledGradeEntry";
 import * as XLSX from "xlsx";
 
 export default function GradeEntrySection({ classinfo }) {
@@ -343,10 +349,13 @@ export default function GradeEntrySection({ classinfo }) {
       if (result.stats.failed === 0) {
         message.success(`成功导入 ${result.stats.success} 条记录`);
         // 导入成功后更新基准数据
-        const updatedStudents = prev.map((s) => {
+        const updatedStudents = students.map((s) => {
           const imported = importData.data.find((i) => i.stu_no === s.stu_no);
           return imported ? { ...s, grade: imported.grade } : s;
         });
+        // 更新学生数据状态
+        setStudents(updatedStudents);
+        // 导入成功后更新基准数据
         initialGrades.current = new Map(
           updatedStudents.map((s) => [s.stu_sn, s.grade])
         );
@@ -355,6 +364,7 @@ export default function GradeEntrySection({ classinfo }) {
           `导入完成，成功 ${result.stats.success} 条，失败 ${result.stats.failed} 条`
         );
       }
+      handleCloseImportModal();
     } catch (error) {
       message.error(`导入失败: ${error.info?.detail || error.message}`);
       handleCloseImportModal();
@@ -405,26 +415,26 @@ export default function GradeEntrySection({ classinfo }) {
   };
 
   return (
-    <div className="grade-entry-container">
-      <div className="grade-toolbar">
+    <GradeEntryContainer>
+      <GradeToolbar>
         <div>
-          <Button onClick={handleDownloadTemplate}>下载模板</Button>
-          <Button
+          <CustomButton onClick={handleDownloadTemplate}>下载模板</CustomButton>
+          <CustomButton
             type="primary"
             onClick={() => document.getElementById("excel-upload").click()}
           >
             导入Excel
-          </Button>
-          <Button
+          </CustomButton>
+          <CustomButton
             type="primary"
             onClick={handleSave}
             loading={saving}
             disabled={!hasChanges || loading || students.length === 0}
           >
             {saving ? "保存中..." : "批量保存成绩"}
-          </Button>
+          </CustomButton>
         </div>
-        <div className="grade-count">
+        <GradeCount>
           <span>班次: {classinfo.class_no} | </span>
           <span>学生总数: {students.length} | </span>
           <span>已录入: {students.filter((s) => s.grade !== null).length}</span>
@@ -433,8 +443,21 @@ export default function GradeEntrySection({ classinfo }) {
               {autoSaveCountdown}秒后自动保存...
             </span>
           )}
-        </div>
-      </div>
+        </GradeCount>
+      </GradeToolbar>
+      <GradeTable>
+        <Table
+          columns={columns}
+          dataSource={students}
+          loading={loading}
+          pagination={false}
+          rowKey="stu_sn"
+          scroll={{ x: true }}
+          locale={{
+            emptyText: loading ? "加载学生数据中..." : "暂无学生数据",
+          }}
+        />
+      </GradeTable>
 
       {/* 隐藏的文件上传input */}
       <input
@@ -496,19 +519,6 @@ export default function GradeEntrySection({ classinfo }) {
           )}
         </div>
       </Modal>
-
-      <Table
-        columns={columns}
-        dataSource={students}
-        loading={loading}
-        pagination={false}
-        rowKey="stu_sn"
-        scroll={{ x: true }}
-        className="grade-table"
-        locale={{
-          emptyText: loading ? "加载学生数据中..." : "暂无学生数据",
-        }}
-      />
-    </div>
+    </GradeEntryContainer>
   );
 }

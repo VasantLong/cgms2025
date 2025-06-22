@@ -51,41 +51,59 @@ class Student(BaseModel):
         return v
 
 
-# 分页到时候再说
- #   page: int = Query(1, ge=1),
-  #  page_size: int = Query(20, ge=1, le=100
 @router.get("/api/student/list")
 async def get_student_list(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    last_sn: int = Query(None)
-) -> list[Student]:
-    with dblock() as db:
-        query = """
-        SELECT sn AS stu_sn, no AS stu_no, name AS stu_name, gender, enrollment_date 
-        FROM student
-        """
-        params = {}
+    current_user: User = Depends(get_current_active_user)
+) -> dict:
+    try:
+        with dblock() as db:
+            # 计算偏移量
+            offset = (page - 1) * page_size
 
-        # 添加游标分页条件
-        if last_sn:
-            query += " WHERE sn > %(last_sn)s"
-            params["last_sn"] = last_sn
-        # 没有游标时使用传统分页
-        else:
-            params["offset"] = (page - 1) * page_size
+            # 查询总记录数
+            db.execute("SELECT COUNT(*) AS total FROM student")
+            total_row = db.fetchone()
+            total = total_row.total if total_row and hasattr(total_row, "total") else 0
 
-        query += " ORDER BY sn LIMIT %(limit)s"
-        params["limit"] = page_size
-        
-        db.execute(query, params)
-        data = [Student(**asdict(row)) for row in db]
+            # 查询当前页数据
+            db.execute("""
+                    SELECT sn AS stu_sn, 
+                        no AS stu_no, 
+                        name AS stu_name, 
+                        gender, 
+                        enrollment_date 
+                    FROM student
+                    LIMIT %(page_size)s OFFSET %(offset)s
+                    """, 
+                    {"page_size": page_size, "offset": offset})
+            result = db.fetchall()
 
-    return data
+            students = [
+                {
+                    "stu_sn": row.stu_sn,
+                    "stu_no": row.stu_no,
+                    "stu_name": row.stu_name,
+                    "gender": row.gender,
+                    "enrollment_date": row.enrollment_date.isoformat() if row.enrollment_date else None
+                }
+                for row in result
+            ]
+
+            return {
+                "data": students,
+                "total": total
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/api/student/{stu_sn}")
-async def get_student_profile(stu_sn) -> Student:
+async def get_student_profile(
+    stu_sn,
+    current_user: User = Depends(get_current_active_user)
+) -> Student:
     with dblock() as db:
         db.execute(
             """
@@ -105,7 +123,10 @@ async def get_student_profile(stu_sn) -> Student:
 
 
 @router.post("/api/student", status_code=status.HTTP_201_CREATED)
-async def new_student(student: Student) -> Student:
+async def new_student(
+    student: Student,
+    current_user: User = Depends(get_current_active_user)
+) -> Student:
     stu_no = student.stu_no
 
     with dblock() as db:
@@ -143,7 +164,11 @@ async def new_student(student: Student) -> Student:
 
 
 @router.put("/api/student/{stu_sn}")
-async def update_student(stu_sn: int, student: Student):
+async def update_student(
+    stu_sn: int, 
+    student: Student,
+    current_user: User = Depends(get_current_active_user)
+):
     assert student.stu_sn == stu_sn
 
     stu_no = student.stu_no
@@ -159,10 +184,29 @@ async def update_student(stu_sn: int, student: Student):
             student.model_dump(),
         )
 
+@router.get("/api/student/{stu_sn}/has-grades", summary="检查学生是否有成绩记录")
+async def student_has_grades(
+    stu_sn: int,
+    current_user: User = Depends(get_current_active_user)
+):
+    with dblock() as db:
+        db.execute("""
+            SELECT 1 AS has_grade
+            FROM class_grade
+            WHERE stu_sn = %(stu_sn)s
+            LIMIT 1
+        """, {"stu_sn": stu_sn})
+        grade_record = db.fetchone()
+        return {"has_grades": bool(grade_record)}
+
 
 @router.delete("/api/student/{stu_sn}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_student(stu_sn):
+async def delete_student(
+    stu_sn,
+    current_user: User = Depends(get_current_active_user)
+):
     with dblock() as db:
+        # 执行删除操作
         db.execute("DELETE FROM student WHERE sn=%(stu_sn)s", {"stu_sn": stu_sn})
 
 
@@ -171,7 +215,6 @@ async def generate_student_report(
     stu_sn: int,
     current_user: User = Depends(get_current_active_user)
 ):
-    validate_jiaomi_role(current_user.user_name)
     
     with dblock() as db:
         # 获取学生基本信息（复用已有查询逻辑）
@@ -224,7 +267,6 @@ async def export_report(
     format: str = 'xlsx',
     current_user: User = Depends(get_current_active_user)
 ):
-    validate_jiaomi_role(current_user.user_name)
     if format not in ('xlsx', 'pdf'):
         raise HTTPException(status_code=400, detail="不支持的导出格式")
 

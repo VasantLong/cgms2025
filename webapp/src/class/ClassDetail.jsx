@@ -1,13 +1,28 @@
 import { useRef, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation, Form } from "react-router-dom";
 import { fetcher } from "../utils";
+import { ExclamationCircleOutlined } from "@ant-design/icons";
+import { Table, InputNumber, Button, message, Modal, Alert } from "antd";
 import ClassStudentSelection from "./ClassStudentSelection";
 import GradeEntrySection from "./GradeEntrySection";
-import "./class.css";
+import StyledButton from "../components/StyledButton";
+import { FormField } from "../components/StyledForm";
+import {
+  Paper,
+  PaperHead,
+  PaperBody,
+  PaperFooter,
+  StatusBar,
+  Message,
+  ErrorMessage,
+  ErrorButton,
+} from "../components/StyledPaper";
+import { Tabs, Tab } from "../components/StyledComponents";
 
 function ClassDetail({ classinfo }) {
   const formRef = useRef();
   let navigate = useNavigate();
+  const location = useLocation();
 
   const isNew = classinfo.class_sn === null; //区分新增和编辑
   const [isDirty, setDirty] = useState(false);
@@ -44,13 +59,12 @@ function ClassDetail({ classinfo }) {
     if (!course) return;
 
     try {
-      const response = await fetch(
+      const response = await fetcher(
         `/api/class/sequence?cou_sn=${selectedCouSn}&year=${year}&semesterType=${semesterType}`
       );
-      const data = await response.json();
 
       // 自动生成班次号：课程号-当前年份-学期类型-序号（使用课程对象的 course_no）
-      const nextSeq = (data.max_sequence || 0) + (isNew ? 1 : 0); // 编辑时不增加序号
+      const nextSeq = (response.max_sequence || 0) + (isNew ? 1 : 0); // 编辑时不增加序号
       const classNo = `${course.course_no}-${year}S${semesterType}-${nextSeq
         .toString()
         .padStart(2, "0")}`;
@@ -71,6 +85,7 @@ function ClassDetail({ classinfo }) {
       setDirty(true);
     } catch (error) {
       console.error("生成班次信息失败:", error);
+      setActionError(error.info?.detail || error.message);
     }
   };
 
@@ -99,20 +114,16 @@ function ClassDetail({ classinfo }) {
       return;
     }
 
-    fetch("/api/course/list", {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        setCourses(data);
+    const fetchCourseList = async () => {
+      try {
+        // 使用 fetcher 函数获取课程列表
+        const data = await fetcher("/api/course/list");
+        setCourses(Array.isArray(data) ? data : []);
         // 确保在数据加载后设置初始值
         if (!isNew) {
           setSelectedCouSn(classinfo.cou_sn);
         }
-      })
-      .catch((error) => {
+      } catch (error) {
         console.error("加载课程失败:", error);
         // 添加网络错误处理
         if (error.message.includes("Failed to fetch")) {
@@ -124,7 +135,10 @@ function ClassDetail({ classinfo }) {
           setActionError(`加载课程失败: ${error.message}`);
         }
         setCourses([]); // 确保设置为空数组
-      });
+      }
+    };
+
+    fetchCourseList();
 
     // 编辑模式下设置初始值
     if (!isNew) {
@@ -176,6 +190,7 @@ function ClassDetail({ classinfo }) {
 
     setDirty(hasChanged);
   };
+
   // 表单提交处理
   const saveAction = async () => {
     if (!localStorage.getItem("token")) {
@@ -183,35 +198,17 @@ function ClassDetail({ classinfo }) {
       navigate("/login");
       return;
     }
-    if (!isNew) {
-      // 编辑模式下的额外校验
-      const original = {
-        name: classinfo.name,
-        cou_sn: classinfo.cou_sn,
-        semester: classinfo.semester,
-        class_no: classinfo.class_no,
-      };
 
-      const current = {
-        name: generatedValues.name,
-        cou_sn: Number(selectedCouSn),
-        semester: generatedValues.semester,
-        class_no: generatedValues.class_no,
-      };
-
-      if (JSON.stringify(original) !== JSON.stringify(current)) {
-        setActionError("仅允许修改地点字段");
+    if (!formRef.current) return;
+    if (isNew) {
+      if (!formRef.current?.elements.cou_sn.value) {
+        setActionError("请选择关联课程");
         return;
       }
-    }
-    if (!formRef.current) return;
-    if (!formRef.current?.elements.cou_sn.value) {
-      setActionError("请选择关联课程");
-      return;
-    }
-    if (year === "" || semesterType === "") {
-      setActionError("请先选择学年和学期类型");
-      return;
+      if (year === "" || semesterType === "") {
+        setActionError("请先选择学年和学期类型");
+        return;
+      }
     }
 
     const elements = formRef.current.elements;
@@ -228,107 +225,164 @@ function ClassDetail({ classinfo }) {
       setBusy(true);
       setActionError(null);
 
-      let url = data.class_sn ? `/api/class/${data.class_sn}` : "/api/class";
-      let method = data.class_sn ? "PUT" : "POST";
+      let url, method;
+      if (isNew) {
+        // 保留新建班次的完整逻辑
+        url = "/api/class";
+        method = "POST";
+        data.class_no = generatedValues.class_no;
+        data.name = elements.name.value;
+        data.semester = generatedValues.semester;
+        data.cou_sn = Number(elements.cou_sn.value);
+      } else {
+        // 编辑模式仅使用PATCH方法
+        url = `/api/class/${data.class_sn}`;
+        method = "PATCH";
+      }
 
-      const response = await fetch(url, {
+      const response = await fetcher(url, {
         method,
         headers: {
           "Content-Type": "application/json;charset=utf-8",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(isNew ? data : { location: data.location }),
       });
 
-      console.log("classdetial", response);
+      console.log("classdetial response type:", typeof response);
+      console.log("classdetial response:", response);
 
-      if (!response.ok) {
-        // TODO:
-        const error = await response.json();
-        console.error("API Error:", error);
-        throw new Error(error.detail || "更新班次信息失败");
+      const class_data = await response;
+
+      // 修复点1：确保使用后端返回的class_sn
+      const targetSn = isNew ? class_data.class_sn : classinfo.class_sn;
+      if (!targetSn) {
+        throw new Error("未能获取有效的班次编号");
       }
 
-      const class_data = await response.json();
-
       // 修改导航逻辑 - 传递状态避免重新生成
-      navigate(`/class/${class_data.class_sn}`, {
+      navigate(`/class/${targetSn}`, {
         state: {
           preservedValues: {
-            class_no: data.class_no,
-            semester: data.semester,
-            name: data.name,
-            // 保留其他必要字段
-            cou_sn: data.cou_sn,
-            location: data.location,
+            class_no: class_data.class_no || data.class_no,
+            semester: class_data.semester || data.semester,
+            name: class_data.name || data.name,
+            cou_sn: class_data.cou_sn || data.cou_sn,
+            location: class_data.location || data.location,
           },
-          // 标记这是从创建流程过来的
-          fromCreate: true,
         },
         replace: true, // 使用replace而不是push，避免历史记录问题
       });
     } catch (error) {
-      setActionError(error.message);
+      if (error.info && error.info.detail) {
+        setActionError(`请求失败: ${error.info.detail}`);
+      } else if (error.status) {
+        setActionError(`请求失败，状态码: ${error.status} ${error.message}`);
+      } else {
+        setActionError(`保存失败: ${error.message}`);
+      }
     } finally {
       setBusy(false);
     }
   };
 
   const deleteAction = async () => {
-    let response = await fetch(`/api/class/${classinfo.class_sn}`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`, // 添加认证头
-      },
-    });
+    try {
+      setBusy(true);
 
-    if (!response.ok) {
-      console.error(response);
-      return;
+      // 检查是否存在关联学生
+      const linkedStudents = await fetcher(
+        `/api/class/${classinfo.class_sn}/students`
+      );
+      // 检查是否存在成绩记录
+      const grades = await fetcher(
+        `/api/class/${classinfo.class_sn}/students-with-grades`
+      );
+      console.log("grades:", grades);
+      if (linkedStudents?.length > 0 || grades?.length > 0) {
+        message.error("该班次下有学生或成绩记录，不能删除");
+      } else {
+        // 发送删除请求前给出确认提示
+        const confirmResult = await new Promise((resolve) => {
+          Modal.confirm({
+            title: "警告",
+            icon: <ExclamationCircleOutlined />,
+            content: "该操作不可逆，请谨慎确认，是否继续删除？",
+            okText: "确认删除",
+            cancelText: "取消",
+            onOk: () => resolve(true),
+            onCancel: () => resolve(false),
+          });
+        });
+
+        if (!confirmResult) {
+          return;
+        }
+
+        // 发送删除请求
+        const response = await fetcher(`/api/class/${classinfo.class_sn}`, {
+          method: "DELETE",
+        });
+
+        if (response === null || response.ok !== false) {
+          message.success("班次删除成功");
+          navigate("/class/list");
+        } else {
+          console.error(response);
+          throw new Error("删除失败");
+        }
+      }
+    } catch (error) {
+      message.error(error.info?.detail || error.message);
+      setActionError(error.info?.detail || error.message);
+    } finally {
+      setBusy(false);
     }
-
-    navigate("/class/list");
   };
 
   return (
     <>
       {/* 头部班次信息 */}
-      <div className="paper-head">
+      <PaperHead>
         <h2>{isNew ? "新建班次" : `班次详情：${classinfo.name}`}</h2>
-      </div>
+        <div className="head-actions">
+          <StyledButton onClick={() => navigate("/student/list")}>
+            返回列表
+          </StyledButton>
+        </div>
+      </PaperHead>
 
       {/* 选项卡导航 */}
-      <div className="tabs">
-        <button
-          className={`tab ${activeTab === "basic" ? "active" : ""}`}
+      <Tabs>
+        <Tab
+          className={activeTab === "basic" ? "active" : ""}
           onClick={() => setActiveTab("basic")}
         >
           基本信息
-        </button>
+        </Tab>
         {!isNew && (
           <>
-            <button
-              className={`tab ${activeTab === "students" ? "active" : ""}`}
+            <Tab
+              className={activeTab === "students" ? "active" : ""}
               onClick={() => setActiveTab("students")}
             >
               学生管理
-            </button>
-            <button
-              className={`tab ${activeTab === "grades" ? "active" : ""}`}
+            </Tab>
+            <Tab
+              className={activeTab === "grades" ? "active" : ""}
               onClick={() => setActiveTab("grades")}
             >
               成绩录入
-            </button>
+            </Tab>
           </>
         )}
-      </div>
+      </Tabs>
 
       {/* 选项卡内容 */}
       {activeTab === "basic" && (
         <>
-          <div className="paper-body">
+          <PaperBody>
             <form ref={formRef} onChange={checkChange}>
-              <div className="field">
+              <FormField>
                 <label>关联课程：</label>
                 <select
                   name="cou_sn"
@@ -345,9 +399,9 @@ function ClassDetail({ classinfo }) {
                     </option>
                   ))}
                 </select>
-              </div>
+              </FormField>
 
-              <div className="field">
+              <FormField>
                 <label>起始学年：</label>
                 <select
                   value={year}
@@ -367,9 +421,9 @@ function ClassDetail({ classinfo }) {
                     </option>
                   ))}
                 </select>
-              </div>
+              </FormField>
 
-              <div className="field">
+              <FormField>
                 <label>学期类型：</label>
                 <select
                   value={semesterType}
@@ -383,9 +437,9 @@ function ClassDetail({ classinfo }) {
                   <option value="1">秋季学期</option>
                   <option value="2">春季学期</option>
                 </select>
-              </div>
+              </FormField>
 
-              <div className="field">
+              <FormField>
                 <label>班次名称：</label>
                 <div className="generated-value">
                   <span>{generatedValues.name}</span>
@@ -395,9 +449,9 @@ function ClassDetail({ classinfo }) {
                     value={generatedValues.name}
                   />
                 </div>
-              </div>
+              </FormField>
 
-              <div className="field">
+              <FormField>
                 <label>班次号：</label>
                 <div className="generated-value">
                   <span>{generatedValues.class_no}</span>
@@ -407,9 +461,9 @@ function ClassDetail({ classinfo }) {
                     value={generatedValues.class_no}
                   />
                 </div>
-              </div>
+              </FormField>
 
-              <div className="field">
+              <FormField>
                 <label>学期：</label>
                 <div className="generated-value">
                   <span>{generatedValues.semester}</span>
@@ -419,9 +473,9 @@ function ClassDetail({ classinfo }) {
                     value={generatedValues.semester}
                   />
                 </div>
-              </div>
+              </FormField>
 
-              <div className="field">
+              <FormField>
                 <label>地点：</label>
                 <input
                   type="text"
@@ -429,84 +483,44 @@ function ClassDetail({ classinfo }) {
                   defaultValue={classinfo?.location || ""}
                   onChange={checkChange}
                 />
-              </div>
+              </FormField>
             </form>
-          </div>
+          </PaperBody>
 
-          <div className="paper-footer">
+          <PaperFooter>
             <div className="btns">
-              <button className="btn" onClick={deleteAction} disabled={isBusy}>
+              <StyledButton onClick={deleteAction} disabled={isBusy}>
                 删除
-              </button>
-              <button
-                className="btn"
-                onClick={saveAction}
-                disabled={isBusy || !isDirty}
-              >
+              </StyledButton>
+              <StyledButton onClick={saveAction} disabled={isBusy || !isDirty}>
                 保存
-              </button>
-              <button
-                className="btn"
-                onClick={() => {
-                  navigate("/class/list");
-                }}
-              >
-                返回
-              </button>
+              </StyledButton>
             </div>
-          </div>
+          </PaperFooter>
         </>
       )}
 
       {activeTab === "students" && (
-        <>
-          <div className="full-tab-container">
-            <ClassStudentSelection classinfo={classinfo} />
-          </div>
-          <div className="paper-footer">
-            <div className="btns">
-              <button
-                className="btn"
-                onClick={() => {
-                  navigate("/class/list");
-                }}
-              >
-                返回
-              </button>
-            </div>
-          </div>
-        </>
+        <div className="full-tab-container">
+          <ClassStudentSelection classinfo={classinfo} />
+        </div>
       )}
 
       {activeTab === "grades" && (
-        <>
-          <div className="paper-body">
-            <GradeEntrySection classinfo={classinfo} />
-          </div>
-          <div className="paper-footer">
-            <div className="btns">
-              <button
-                className="btn"
-                onClick={() => {
-                  navigate("/class/list");
-                }}
-              >
-                返回
-              </button>
-            </div>
-          </div>
-        </>
+        <PaperBody>
+          <GradeEntrySection classinfo={classinfo} />
+        </PaperBody>
       )}
 
-      <div className="statusbar">
-        {isBusy && <div className="message">处理中，请稍后...</div>}
+      <StatusBar>
+        {isBusy && <Message>处理中，请稍后...</Message>}
         {actionError && (
-          <div className="message error">
+          <ErrorMessage>
             <span>发生错误：{actionError}</span>
-            <button onClick={() => setActionError(null)}>X</button>
-          </div>
+            <ErrorButton onClick={() => setActionError(null)}>X</ErrorButton>
+          </ErrorMessage>
         )}
-      </div>
+      </StatusBar>
     </>
   );
 }

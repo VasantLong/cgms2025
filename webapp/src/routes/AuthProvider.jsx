@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Outlet } from "react-router-dom";
 import { fetcher } from "../utils";
+import { message } from "antd"; // 确保已安装 antd
 
 const AuthProvider = () => {
   const [isValidating, setIsValidating] = useState(true);
@@ -32,6 +33,8 @@ const AuthProvider = () => {
         console.error("Token validation failed:", error);
         localStorage.removeItem("token");
         localStorage.removeItem("user");
+        // 显示错误提示
+        message.error("令牌已失效，请重新登录");
         navigate("/login");
       } finally {
         setIsValidating(false);

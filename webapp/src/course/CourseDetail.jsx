@@ -1,5 +1,19 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { fetcher } from "../utils";
+import { FormField } from "../components/StyledForm";
+import {
+  Paper,
+  PaperHead,
+  PaperBody,
+  PaperFooter,
+  StatusBar,
+  Message,
+  ErrorMessage,
+  ErrorButton,
+} from "../components/StyledPaper";
+import StyledButton from "../components/StyledButton";
+import { message, Modal } from "antd";
 
 function CourseDetail({ courseinfo }) {
   const formRef = useRef(null);
@@ -25,22 +39,13 @@ function CourseDetail({ courseinfo }) {
   }, [courseinfo]);
 
   const checkChange = (e) => {
-    if (!formRef.current) return;
-
-    if (courseinfo.course_sn === null) {
-      if (!isDirty) setDirty(true);
-      return;
-    }
-
-    for (let fieldName of ["course_no", "course_name", "credit", "hours"]) {
-      if (courseinfo[fieldName] !== formRef.current.elements[fieldName].value) {
-        if (!isDirty) setDirty(true);
-        return;
-      }
-    }
-
-    if (isDirty) {
-      setDirty(false);
+    // 检查输入验证逻辑
+    if (e.target.name === "course_no" && !e.target.value.match(/^\d{5}$/)) {
+      setActionError("detail：课程号必须为 5 位数字");
+    } else if (e.target.name === "credit" && Number(e.target.value) <= 0) {
+      setActionError("detail：学分必须大于 0");
+    } else {
+      setActionError(null);
     }
   };
 
@@ -49,7 +54,6 @@ function CourseDetail({ courseinfo }) {
 
     const elements = formRef.current.elements;
     let data = {
-      course_sn: courseinfo.course_sn,
       course_no: elements.course_no.value,
       course_name: elements.course_name.value,
       credit: Number(elements.credit.value),
@@ -57,12 +61,13 @@ function CourseDetail({ courseinfo }) {
     };
 
     let url, http_method;
-    if (data.course_sn === null) {
+    if (courseinfo.course_sn === null) {
       // 新建课程记录
       url = `/api/course`;
       http_method = "POST";
     } else {
       // 更新课程记录信息
+      data.course_sn = courseinfo.course_sn;
       url = `/api/course/${courseinfo.course_sn}`;
       http_method = "PUT";
     }
@@ -71,53 +76,79 @@ function CourseDetail({ courseinfo }) {
       setBusy(true);
 
       // 向服务器发送请求
-      let response = await fetch(url, {
+      const response = await fetcher(url, {
         method: http_method,
         headers: {
           "Content-Type": "application/json;charset=utf-8",
         },
-        body: JSON.stringify(data), // 将data对象序列化为JSON的字符串
+        body: JSON.stringify(data),
       });
 
-      console.log("coursedetial", response);
-
-      if (!response.ok) {
-        // TODO: 较草率处理错误
-        console.error(response);
-        const error = await response.json();
-        setActionError(error.message);
-        return;
-      }
-
-      const course = await response.json();
-
       if (courseinfo.course_sn === null) {
-        navigate(`/course/${course.course_sn}/edit`);
+        navigate(`/course/${response.course_sn}`);
         return;
       }
+    } catch (error) {
+      setActionError(error.info?.detail || error.message);
     } finally {
       setBusy(false);
     }
   };
 
   const deleteAction = async () => {
-    let response = await fetch(`/api/course/${courseinfo.course_sn}`, {
-      method: "DELETE",
-    });
+    try {
+      setBusy(true); // 开始删除操作，设置为忙
 
-    if (!response.ok) {
-      console.error(response);
-      return;
+      // 检查课程是否有相关引用（如被班次引用）
+      const { has_references } = await fetcher(
+        `/api/course/${courseinfo.course_sn}/has-references`
+      );
+      if (has_references) {
+        message.error("该课程有相关引用，不能删除");
+        return;
+      } else {
+        // 发送删除请求前给出确认提示
+        const confirmResult = await new Promise((resolve) => {
+          Modal.confirm({
+            title: "警告",
+            content: "该操作不可逆，请谨慎确认，是否继续删除？",
+            okText: "确认删除",
+            cancelText: "取消",
+            onOk: () => resolve(true),
+            onCancel: () => resolve(false),
+          });
+        });
+
+        if (!confirmResult) {
+          return;
+        }
+        // 使用 fetcher 函数发送删除请求
+        await fetcher(`/api/course/${courseinfo.course_sn}`, {
+          method: "DELETE",
+        });
+        message.success("课程删除成功");
+        navigate("/course/list");
+      }
+    } catch (error) {
+      message.error(error.info?.detail || error.message);
+      setActionError(error.info?.detail || error.message);
+    } finally {
+      setBusy(false); // 动作结束，设置为非忙
     }
-
-    navigate("/course/list");
   };
 
   return (
     <>
-      <div className="paper-body">
+      <PaperHead>
+        <div className="head-actions">
+          <StyledButton onClick={() => navigate("/course/list")}>
+            返回列表
+          </StyledButton>
+        </div>
+      </PaperHead>
+      <PaperBody>
         <form ref={formRef}>
-          <div className="field">
+          <FormField>
             <label>课程编号: </label>
             <input
               type="text"
@@ -129,12 +160,12 @@ function CourseDetail({ courseinfo }) {
                 else setActionError(null);
               }}
             />
-          </div>
-          <div className="field">
+          </FormField>
+          <FormField>
             <label>课程名称: </label>
             <input type="text" name="course_name" onChange={checkChange} />
-          </div>
-          <div className="field">
+          </FormField>
+          <FormField>
             <label>学分: </label>
             <input
               type="number"
@@ -146,8 +177,8 @@ function CourseDetail({ courseinfo }) {
                 else setActionError(null);
               }}
             />
-          </div>
-          <div className="field">
+          </FormField>
+          <FormField>
             <label>学时: </label>
             <input
               type="number"
@@ -159,40 +190,28 @@ function CourseDetail({ courseinfo }) {
                 else setActionError(null);
               }}
             />
-          </div>
+          </FormField>
         </form>
-      </div>
-      <div className="paper-footer">
+      </PaperBody>
+      <PaperFooter>
         <div className="btns">
-          <button className="btn" onClick={deleteAction} disabled={isBusy}>
+          <StyledButton onClick={deleteAction} disabled={isBusy}>
             删除
-          </button>
-          <button
-            className="btn"
-            onClick={saveAction}
-            disabled={isBusy || !isDirty}
-          >
+          </StyledButton>
+          <StyledButton onClick={saveAction} disabled={isBusy || !!actionError}>
             保存
-          </button>
-          <button
-            className="btn"
-            onClick={() => {
-              navigate("/course/list");
-            }}
-          >
-            返回
-          </button>
+          </StyledButton>
         </div>
-      </div>
-      <div className="statusbar">
-        {isBusy && <div className="message">处理中，请稍后...</div>}
+      </PaperFooter>
+      <StatusBar>
+        {isBusy && <Message>处理中，请稍后...</Message>}
         {actionError && (
-          <div className="message error">
+          <ErrorMessage>
             <span>发生错误：{actionError}</span>
-            <button onClick={() => setActionError(null)}>X</button>
-          </div>
+            <ErrorButton onClick={() => setActionError(null)}>X</ErrorButton>
+          </ErrorMessage>
         )}
-      </div>
+      </StatusBar>
     </>
   );
 }

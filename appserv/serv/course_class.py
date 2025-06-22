@@ -1,6 +1,6 @@
 import asyncio
 from dataclasses import asdict
-from fastapi import status, Depends, Query
+from fastapi import status, Depends, Query, Body
 import datetime as dt
 from fastapi import HTTPException, APIRouter
 import re
@@ -36,34 +36,62 @@ def validate_jiaomi_role(username: str):
             detail="仅教秘用户可执行此操作"
         )
 
-@router.get("/api/class/list")
+@router.get("/api/class/list", summary="获取班次列表")
 async def get_class_list(
-    course_sn: int = Query(None),  # 新增过滤参数
+    course_sn: int = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_active_user)
-):
-    with dblock() as db:
-        base_query = """
-            SELECT cl.sn AS class_sn, cl.class_no, cl.name, 
-                   cl.semester, cl.location, c.name AS course_name
-            FROM class cl
-            JOIN course c ON cl.cou_sn = c.sn
-        """
-        params = {}
-        if course_sn:
-            base_query += " WHERE cl.cou_sn = %(course_sn)s"
-            params["course_sn"] = course_sn
+) -> dict:
+    try:
+        with dblock() as db:
+            offset = (page - 1) * page_size
+            base_query = """
+                SELECT COUNT(*) AS total
+                FROM class cl
+                JOIN course c ON cl.cou_sn = c.sn
+            """
+            params = {}
+            if course_sn:
+                base_query += " WHERE cl.cou_sn = %(course_sn)s"
+                params["course_sn"] = course_sn
             
-        base_query += " ORDER BY cl.semester DESC, cl.class_no"
-        db.execute(base_query, params)
-        return [asdict(row) for row in db]
+            db.execute(base_query, params)
+            total_row = db.fetchone()
+            total = total_row.total if total_row and hasattr(total_row, "total") else 0
+
+            base_query = """
+                SELECT cl.sn AS class_sn, cl.class_no, cl.name, 
+                       cl.semester, cl.location, c.name AS course_name
+                FROM class cl
+                JOIN course c ON cl.cou_sn = c.sn
+            """
+            if course_sn:
+                base_query += " WHERE cl.cou_sn = %(course_sn)s"
+            base_query += " ORDER BY cl.semester DESC, cl.class_no"
+            base_query += " LIMIT %(page_size)s OFFSET %(offset)s"
+            params["page_size"] = page_size
+            params["offset"] = offset
+
+            db.execute(base_query, params)
+            result = db.fetchall()
+            classes = [asdict(row) for row in result]
+
+            return {
+                "data": classes,
+                "total": total
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # 获取指定课程在特定学年学期下的最新班次序号
-@router.get("/api/class/sequence")
+@router.get("/api/class/sequence", summary="获取最新班次序号")
 async def get_class_sequence(
     cou_sn: int, 
     year: int, 
     semester_type: str = Query(..., alias="semesterType"),
-    exclude_class_sn: int | None = Query(None)
+    exclude_class_sn: int | None = Query(None),
+    current_user: User = Depends(get_current_active_user)
 ):  # 使用别名# 新增参数，用于排除当前班次
     
     # 匹配某课程特定学期（比如2023S1）的班次，返回最大的序号
@@ -90,8 +118,11 @@ async def get_class_sequence(
         max_sequence = row.max_seq if (row and row.max_seq is not None) else 0
         return {"max_sequence": max_sequence}
 
-@router.get("/api/class/{class_sn}")
-async def get_class_profile(class_sn) -> Class:
+@router.get("/api/class/{class_sn}", summary="获取班次详情")
+async def get_class_profile(
+    class_sn,
+    current_user: User = Depends(get_current_active_user)
+) -> Class:
     with dblock() as db:
         db.execute(
             """
@@ -110,7 +141,7 @@ async def get_class_profile(class_sn) -> Class:
     return row
 
 # 确认课程号包含在班次号中
-@router.post("/api/class", status_code=status.HTTP_201_CREATED)
+@router.post("/api/class", summary="创建班次", status_code=status.HTTP_201_CREATED)
 async def create_class(
     class_data: Class, 
     current_user: User = Depends(get_current_active_user)
@@ -216,18 +247,72 @@ async def update_class(
     
     return class_data
 
-@router.delete("/api/class/{class_sn}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/api/class/{class_sn}", summary="删除班次", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_class(
     class_sn: int,
     current_user: User = Depends(get_current_active_user)
 ):
-    validate_jiaomi_role(current_user.user_name)  # 新增角色校验
+    validate_jiaomi_role(current_user.user_name)
     with dblock() as db:
-        db.execute(
-            "DELETE FROM class WHERE sn=%(class_sn)s",
-            {"class_sn": class_sn}
-        )
-        if db.rowcount == 0:
-            raise HTTPException(404, "班次不存在")
+        try:
+            # 检查班次下是否有学生记录
+            db.execute(
+                "SELECT COUNT(*) AS student_count FROM class_student WHERE class_sn = %(class_sn)s",
+                {"class_sn": class_sn}
+            )
+            student_row = db.fetchone()
+            student_count = student_row.student_count if student_row else 0
 
-# 其他辅助函数...
+            # 检查班次下是否有成绩记录
+            db.execute(
+                "SELECT COUNT(*)  AS grade_count FROM class_grade WHERE class_sn = %(class_sn)s",
+                {"class_sn": class_sn}
+            )
+            grade_row = db.fetchone()
+            grade_count = grade_row.grade_count if grade_row else 0
+
+            if student_count > 0 or grade_count > 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="该班次下有学生或成绩记录，不能删除"
+                )
+            
+            db.execute(
+                "DELETE FROM class WHERE sn=%(class_sn)s",
+                {"class_sn": class_sn}
+            )
+            if db.rowcount == 0:
+                raise HTTPException(404, "班次不存在")
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"删除班次时发生错误: {str(e)}"
+            )          
+
+@router.patch("/api/class/{class_sn}", status_code=status.HTTP_200_OK)
+async def update_class_location(
+    class_sn: int, 
+    location: str = Body(..., embed=True),
+    current_user: User = Depends(get_current_active_user)
+):
+    validate_jiaomi_role(current_user.user_name)
+    
+    with dblock() as db:
+        # 仅更新location字段
+        db.execute(
+            "UPDATE class SET location=%(loc)s WHERE sn=%(sn)s",
+            {"loc": location, "sn": class_sn}
+        )
+            # 修改返回数据，包含完整班次信息
+        db.execute("""
+            SELECT sn AS class_sn, class_no, 
+                   name, semester, location, cou_sn
+            FROM class WHERE sn=%(sn)s
+            """,
+            {"sn": class_sn}
+        )
+        updated_class = db.fetchone()
+    return updated_class

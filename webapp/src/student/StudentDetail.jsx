@@ -1,9 +1,35 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Tabs, Descriptions, Table, Statistic, Button, Card } from "antd";
+import StyledButton from "../components/StyledButton";
+import { FormField } from "../components/StyledForm";
+import {
+  Descriptions,
+  Table,
+  Statistic,
+  Button,
+  Card,
+  Modal,
+  message,
+} from "antd";
+import {
+  Paper,
+  PaperHead,
+  PaperBody,
+  StatusBar,
+  Message,
+  ErrorMessage,
+  ErrorButton,
+  PaperFooter,
+} from "../components/StyledPaper";
+import {
+  Tabs,
+  Tab,
+  ActionBar,
+  StatsSummary,
+} from "../components/StyledComponents";
 import { fetcher } from "../utils";
-import useSWR from "swr";
-import "./student.css";
+import useSWR, { mutate } from "swr";
+import { useSWRConfig } from "swr";
 
 function StudentDetail({ stuinfo }) {
   const [activeTab, setActiveTab] = useState("basic");
@@ -41,7 +67,7 @@ function StudentDetail({ stuinfo }) {
     elements.enrollment_date.value = stuinfo.enrollment_date ?? null;
 
     setDirty(false);
-  }, [stuinfo, isNew]);
+  }, [stuinfo, isNew, activeTab]);
 
   const checkChange = (e) => {
     if (!formRef.current) return;
@@ -51,10 +77,30 @@ function StudentDetail({ stuinfo }) {
       return;
     }
 
+    const fieldName = e.target.name;
+    const value = e.target.value;
+
     for (let fieldName of ["stu_no", "stu_name", "gender", "enrollment_date"]) {
       if (stuinfo[fieldName] !== formRef.current.elements[fieldName].value) {
         if (!isDirty) setDirty(true);
         return;
+      }
+      if (fieldName === "enrollment_date" || fieldName === "stu_no") {
+        const enrollmentDate = formRef.current.elements.enrollment_date.value;
+        const stuNo = formRef.current.elements.stu_no.value;
+        console.log(enrollmentDate, stuNo);
+        if (enrollmentDate && stuNo) {
+          const enrollmentYear = new Date(enrollmentDate)
+            .getFullYear()
+            .toString()
+            .slice(2);
+          const stuNoPrefix = stuNo.slice(0, 2);
+
+          if (enrollmentYear !== stuNoPrefix) {
+            setActionError("学号的前两位应与入学时间的年份后两位对应");
+            return;
+          }
+        }
       }
     }
 
@@ -104,62 +150,78 @@ function StudentDetail({ stuinfo }) {
       return;
     }
 
-    let url, http_method;
+    let url;
     if (isNew) {
-      // 新建学生记录
       url = `/api/student`;
-      http_method = "POST";
     } else {
-      // 更新学生记录信息
       url = `/api/student/${stuinfo.stu_sn}`;
-      http_method = "PUT";
     }
 
     try {
       setBusy(true); // 开始向服务提交请求，设置为忙
 
-      // 向服务器发送请求
-      let response = await fetch(url, {
-        method: http_method,
+      // 使用 fetcher 函数发送请求
+      const response = await fetcher(url, {
+        method: isNew ? "POST" : "PUT",
         headers: {
           "Content-Type": "application/json;charset=utf-8",
         },
-        body: JSON.stringify(data), // 将data对象序列化为JSON的字符串
+        body: JSON.stringify(data),
       });
-
-      console.log("studetail", response);
-
-      if (!response.ok) {
-        // TODO: 较草率处理错误
-        console.error(response);
-        const error = await response.json();
-        setActionError(error.message);
-        return;
-      }
-
-      const student = await response.json();
 
       if (stuinfo.stu_sn === null) {
         // 创建新学生记录后，按照新分配的序号重新加载学生信息
-        navigate(`/student/${student.stu_sn}`);
+        navigate(`/student/${response.stu_sn}`);
         return;
       }
+    } catch (error) {
+      setActionError(error.info?.detail || error.message);
     } finally {
       setBusy(false); // 动作结束，设置为非忙
     }
   };
 
   const deleteAction = async () => {
-    let response = await fetch(`/api/student/${stuinfo.stu_sn}`, {
-      method: "DELETE",
-    });
+    try {
+      setBusy(true); // 开始删除操作，设置为忙
 
-    if (!response.ok) {
-      console.error(response);
-      return;
+      // 检查学生是否有成绩记录
+      const { has_grades } = await fetcher(
+        `/api/student/${stuinfo.stu_sn}/has-grades`
+      );
+      if (has_grades) {
+        message.error("该学生有成绩记录，不能删除");
+        return;
+      } else {
+        // 发送删除请求前给出确认提示
+        const confirmResult = await new Promise((resolve) => {
+          Modal.confirm({
+            title: "警告",
+            content: "该操作不可逆，请谨慎确认，是否继续删除？",
+            okText: "确认删除",
+            cancelText: "取消",
+            onOk: () => resolve(true),
+            onCancel: () => resolve(false),
+          });
+        });
+
+        if (!confirmResult) {
+          return;
+        }
+        // 使用 fetcher 函数发送删除请求
+        await fetcher(`/api/student/${stuinfo.stu_sn}`, {
+          method: "DELETE",
+        });
+        // 手动刷新学生列表
+        mutate("/api/student/list");
+        navigate("/student/list");
+      }
+    } catch (error) {
+      message.error(error.info?.detail || error.message);
+      setActionError(error.info?.detail || error.message);
+    } finally {
+      setBusy(false); // 动作结束，设置为非忙
     }
-
-    navigate("/student/list");
   };
 
   // 新增导出功能
@@ -172,10 +234,8 @@ function StudentDetail({ stuinfo }) {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
-          responseType: "blob",
         }
       );
-
       if (!response.ok) {
         throw new Error(`导出失败：${response.statusText}`);
       }
@@ -206,37 +266,40 @@ function StudentDetail({ stuinfo }) {
   };
 
   return (
-    // 标签<> </>在JSX表示嵌套是一段JSX元素的片段
     <>
       {/* 头部 */}
-      <div className="paper-head">
+      <PaperHead>
         <h2>{isNew ? "新建学生档案" : `学生详情：${stuinfo.stu_name}`}</h2>
         <div className="head-actions">
-          <Button onClick={() => navigate(-1)}>返回列表</Button>
+          <StyledButton onClick={() => navigate("/student/list")}>
+            返回列表
+          </StyledButton>
         </div>
-      </div>
+      </PaperHead>
 
       {/* 选项卡导航 */}
-      <div className="tabs">
-        <button
-          className={`tab ${activeTab === "basic" ? "active" : ""}`}
+      <Tabs>
+        <Tab
+          className={`${activeTab === "basic" ? "active" : ""}`}
           onClick={() => setActiveTab("basic")}
         >
           基本信息
-        </button>
-        <button
-          className={`tab ${activeTab === "report" ? "active" : ""}`}
-          onClick={() => setActiveTab("report")}
-        >
-          成绩档案
-        </button>
-      </div>
+        </Tab>
+        {!isNew && (
+          <Tab
+            className={`${activeTab === "report" ? "active" : ""}`}
+            onClick={() => setActiveTab("report")}
+          >
+            成绩档案
+          </Tab>
+        )}
+      </Tabs>
 
       {/* 标签页内容 */}
       {activeTab === "basic" && (
-        <div className="paper-body">
+        <PaperBody>
           <form ref={formRef}>
-            <div className="field">
+            <FormField>
               <label>学号: </label>
               <input
                 type="text"
@@ -244,8 +307,8 @@ function StudentDetail({ stuinfo }) {
                 onChange={checkChange}
                 disabled={!isNew} // 仅新增模式可编辑
               />
-            </div>
-            <div className="field">
+            </FormField>
+            <FormField>
               <label>姓名: </label>
               <input
                 type="text"
@@ -253,8 +316,8 @@ function StudentDetail({ stuinfo }) {
                 onChange={checkChange}
                 disabled={!isNew}
               />
-            </div>
-            <div className="field">
+            </FormField>
+            <FormField>
               <label>性别: </label>
               <div className="radio-choices">
                 <span className="option">
@@ -278,8 +341,8 @@ function StudentDetail({ stuinfo }) {
                   />
                 </span>
               </div>
-            </div>
-            <div className="field">
+            </FormField>
+            <FormField>
               <label>入学时间: </label>
               <input
                 type="date"
@@ -287,47 +350,35 @@ function StudentDetail({ stuinfo }) {
                 onChange={checkChange}
                 disabled={!isNew} // 仅新增模式可编辑
               />
-            </div>
+            </FormField>
           </form>
-          <div className="paper-footer">
+          <PaperFooter>
             <div className="btns">
-              <button className="btn" onClick={deleteAction} disabled={isBusy}>
+              <StyledButton onClick={deleteAction} disabled={isBusy}>
                 删除
-              </button>
-              <button
-                className="btn"
-                onClick={saveAction}
-                disabled={isBusy || !isDirty}
-              >
+              </StyledButton>
+              <StyledButton onClick={saveAction} disabled={isBusy || !isDirty}>
                 保存
-              </button>
-              <button
-                className="btn"
-                onClick={() => {
-                  navigate("/student/list");
-                }}
-              >
-                返回
-              </button>
+              </StyledButton>
             </div>
-          </div>
-        </div>
+          </PaperFooter>
+        </PaperBody>
       )}
-      {activeTab === "report" && (
-        <div className="paper-body">
+      {!isNew && activeTab === "report" && (
+        <PaperBody>
           <div className="full-tab-container">
-            <div className="action-bar">
-              <Button type="primary" onClick={() => handleExport("xlsx")}>
+            <ActionBar>
+              <StyledButton type="primary" onClick={() => handleExport("xlsx")}>
                 导出Excel
-              </Button>
-              <Button type="primary" onClick={() => handleExport("pdf")}>
+              </StyledButton>
+              <StyledButton type="primary" onClick={() => handleExport("pdf")}>
                 导出PDF
-              </Button>
-              <span className="stats-summary">
+              </StyledButton>
+              <StatsSummary>
                 总学分：{data?.stats.total_credits || 0}| 平均成绩：
                 {data?.stats.gpa?.toFixed(2) || "N/A"}
-              </span>
-            </div>
+              </StatsSummary>
+            </ActionBar>
 
             {/* 带分页的表格 */}
             <Table
@@ -366,33 +417,20 @@ function StudentDetail({ stuinfo }) {
               scroll={{ x: 800 }}
             />
           </div>
-
-          <div className="paper-footer">
-            <div className="btns">
-              <button
-                className="btn"
-                onClick={() => {
-                  navigate("/student/list");
-                }}
-              >
-                返回
-              </button>
-            </div>
-          </div>
-        </div>
+        </PaperBody>
       )}
 
-      <div className="status-bar">
+      <StatusBar>
         {isBusy && <div className="processing-indicator">数据提交中...</div>}
         {actionError && (
-          <div className="error-message">
+          <ErrorMessage>
             ❌ 操作失败：{actionError}
             <button className="close-btn" onClick={() => setActionError(null)}>
               ×
             </button>
-          </div>
+          </ErrorMessage>
         )}
-      </div>
+      </StatusBar>
     </>
   );
 }

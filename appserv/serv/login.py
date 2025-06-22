@@ -36,11 +36,6 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
-
-@router.get("/api/show-secret")
-async def show_secret():
-    return {"SECRET_KEY": os.getenv("SECRET_KEY")}
-
 # 登录接口
 @router.post("/api/token", response_model=Token)
 @limiter.limit("5/minute")  # 添加速率限制

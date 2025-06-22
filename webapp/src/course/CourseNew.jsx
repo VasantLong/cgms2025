@@ -2,6 +2,16 @@ import { useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import CourseDetail from "./CourseDetail";
 import useSWR from "swr";
+import { StyledTable } from "../components/StyledTable";
+import {
+  Paper,
+  PaperHead,
+  PaperBody,
+  StatusBar,
+  Message,
+  ErrorMessage,
+  ErrorButton,
+} from "../components/StyledPaper";
 
 function CourseNew(props) {
   let courseinfo = {
@@ -9,12 +19,14 @@ function CourseNew(props) {
   };
 
   return (
-    <div className="paper">
-      <div className="paper-head">
+    <Paper>
+      <PaperHead>
         <h3>新建课程信息</h3>
-      </div>
-      <CourseDetail courseinfo={courseinfo} />
-    </div>
+      </PaperHead>
+      <PaperBody>
+        <CourseDetail courseinfo={courseinfo} />
+      </PaperBody>
+    </Paper>
   );
 }
 

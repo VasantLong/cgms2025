@@ -3,7 +3,7 @@ from dataclasses import asdict
 from fastapi import status, APIRouter, Query, Depends, HTTPException
 from fastapi_cache.decorator import cache
 import datetime as dt
-
+from psycopg.errors import ForeignKeyViolation
 from pydantic import BaseModel, field_validator
 from .config import app, dblock
 from .error import ConflictError, InvalidError
@@ -12,7 +12,7 @@ from .auth import get_current_active_user, User
 router = APIRouter(tags=["课程管理"])
 
 class Course(BaseModel):
-    course_sn: int | None
+    course_sn: int | None = None
     course_no: str
     course_name: str
     credit: float | None
@@ -37,32 +37,59 @@ class Course(BaseModel):
         return v
 
 @router.get("/api/course/list", summary="获取课程列表")
-@cache(expire=300)  # 添加5分钟缓存
+#@cache(expire=300)  # 添加5分钟缓存
 async def get_course_list(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_active_user)
-):
-    offset = (page - 1) * page_size
-    with dblock() as db:
-        db.execute("""
-            SELECT 
-                c.sn AS course_sn,
-                c.no AS course_no,
-                c.name AS course_name,
-                c.credit,
-                c.hours
-            FROM course AS c
-            ORDER BY c.no
-            LIMIT %(limit)s OFFSET %(offset)s
-            """,
-            {"limit": page_size, "offset": offset}
-        )
-        return [asdict(row) for row in db]
+) -> dict:
+    try:
+        with dblock() as db:
+            # 计算偏移量
+            offset = (page - 1) * page_size
+
+            # 查询总记录数
+            db.execute("SELECT COUNT(*) AS total FROM course")
+            total_row = db.fetchone()
+            total = total_row.total if total_row and hasattr(total_row, "total") else 0
+
+            # 查询当前页数据
+            db.execute("""
+                    SELECT sn AS course_sn, 
+                        no AS course_no, 
+                        name AS course_name, 
+                        credit, 
+                        hours 
+                    FROM course
+                    LIMIT %(page_size)s OFFSET %(offset)s
+                    """, 
+                    {"page_size": page_size, "offset": offset})
+            result = db.fetchall()
+
+            courses = [
+                {
+                    "course_sn": row.course_sn,
+                    "course_no": row.course_no,
+                    "course_name": row.course_name,
+                    "credit": row.credit,
+                    "hours": row.hours
+                }
+                for row in result
+            ]
+
+            return {
+                "data": courses,
+                "total": total
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/api/course/{course_sn}")
-async def get_course_profile(course_sn) -> Course:
+async def get_course_profile(
+    course_sn, 
+    current_user: User = Depends(get_current_active_user)
+) -> Course:
     with dblock() as db:
         db.execute(
             """
@@ -82,39 +109,48 @@ async def get_course_profile(course_sn) -> Course:
 
 
 @router.post("/api/course", status_code=status.HTTP_201_CREATED)
-async def new_course(course: Course) -> Course:
-    course_no = course.course_no
-    #course_dict = course.model_dump()
-    #course_no = course_dict.get('course_no')
+async def new_course(
+    course: Course, 
+    current_user: User = Depends(get_current_active_user)
+) -> Course:
     with dblock() as db:
+        # 检查课程号是否已存在（避免重复课程号）
         db.execute(
-            """
-            SELECT sn AS course_sn, name AS course_name FROM course
-            WHERE no=%(course_no)s
-            """,
-            dict(course_no=course_no),
+            "SELECT sn FROM course WHERE no = %(course_no)s",
+            {"course_no": course.course_no}
         )
-        record = db.fetchone()
-        if record:
-            raise ConflictError(
-                f"课程号'{course_no}'已被{record.course_name}(#{record.course_sn}占用"
+        if db.fetchone():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"课程号 {course.course_no} 已存在"
             )
 
+        # 插入时不传递 sn，使用数据库自增序列
         db.execute(
             """
             INSERT INTO course (no, name, credit, hours)
-            VALUES(%(course_no)s, %(course_name)s, %(credit)s, %(hours)s) 
-            RETURNING sn""",
-            course.model_dump(),
+            VALUES (%(course_no)s, %(course_name)s, %(credit)s, %(hours)s)
+            RETURNING sn AS course_sn
+            """,
+            course.model_dump()
         )
         row = db.fetchone()
-        course.course_sn = row.sn # type: ignore
-
-    return course
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="插入课程失败，未获取到生成的 sn"
+            )
+        course_data = course.model_dump()
+        course_data["course_sn"] = row.course_sn  # 覆盖原有可能的 null 或重复值
+        return Course(**course_data)
 
 
 @router.put("/api/course/{course_sn}")
-async def update_course(course_sn: int, course: Course):
+async def update_course(
+    course_sn: int, 
+    course: Course, 
+    current_user: User = Depends(get_current_active_user)
+):
     assert course_sn == course.course_sn
     course_no = course.course_no
     with dblock() as db:
@@ -127,8 +163,37 @@ async def update_course(course_sn: int, course: Course):
             course.model_dump(),
         )
 
+@router.get("/api/course/{course_sn}/has-references")
+async def course_has_references(
+    course_sn: int,
+    current_user: User = Depends(get_current_active_user)
+):
+    with dblock() as db:
+        # 检查课程是否被班次引用
+        db.execute(
+            """
+            SELECT 1 AS has_references
+            FROM class
+            WHERE cou_sn = %(course_sn)s
+            LIMIT 1
+            """,
+            dict(course_sn=course_sn)
+        )
+        row = db.fetchone()
+
+    has_references = row is not None
+    return {"has_references": has_references}
 
 @router.delete("/api/course/{course_sn}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_course(course_sn):
+async def delete_course(
+    course_sn, 
+    current_user: User = Depends(get_current_active_user)
+):
     with dblock() as db:
-        db.execute("DELETE FROM course WHERE sn=%(course_sn)s", {"course_sn": course_sn})
+        try:
+            db.execute("DELETE FROM course WHERE sn=%(course_sn)s", {"course_sn": course_sn})
+        except ForeignKeyViolation:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"课程(sn={course_sn}) 被班次引用，不能删除"
+            )
