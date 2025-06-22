@@ -5,7 +5,6 @@ import { ExclamationCircleOutlined } from "@ant-design/icons";
 import { Table, InputNumber, Button, message, Modal, Alert } from "antd";
 import ClassStudentSelection from "./ClassStudentSelection";
 import GradeEntrySection from "./GradeEntrySection";
-import "./class.css";
 import StyledButton from "../components/StyledButton";
 import { FormField } from "../components/StyledForm";
 import {
@@ -18,6 +17,7 @@ import {
   ErrorMessage,
   ErrorButton,
 } from "../components/StyledPaper";
+import { Tabs, Tab } from "../components/StyledComponents";
 
 function ClassDetail({ classinfo }) {
   const formRef = useRef();
@@ -352,30 +352,30 @@ function ClassDetail({ classinfo }) {
       </PaperHead>
 
       {/* 选项卡导航 */}
-      <div className="tabs">
-        <button
-          className={`tab ${activeTab === "basic" ? "active" : ""}`}
+      <Tabs>
+        <Tab
+          className={activeTab === "basic" ? "active" : ""}
           onClick={() => setActiveTab("basic")}
         >
           基本信息
-        </button>
+        </Tab>
         {!isNew && (
           <>
-            <button
-              className={`tab ${activeTab === "students" ? "active" : ""}`}
+            <Tab
+              className={activeTab === "students" ? "active" : ""}
               onClick={() => setActiveTab("students")}
             >
               学生管理
-            </button>
-            <button
-              className={`tab ${activeTab === "grades" ? "active" : ""}`}
+            </Tab>
+            <Tab
+              className={activeTab === "grades" ? "active" : ""}
               onClick={() => setActiveTab("grades")}
             >
               成绩录入
-            </button>
+            </Tab>
           </>
         )}
-      </div>
+      </Tabs>
 
       {/* 选项卡内容 */}
       {activeTab === "basic" && (

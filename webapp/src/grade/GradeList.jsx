@@ -4,7 +4,6 @@ import { Select, Input } from "antd";
 import useSWR from "swr";
 import GradeTable from "./GradeTable";
 import { fetcher } from "../utils";
-import "./grade.css";
 import { StyledTable } from "../components/StyledTable";
 import {
   Paper,

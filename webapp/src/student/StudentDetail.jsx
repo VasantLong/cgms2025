@@ -3,7 +3,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import StyledButton from "../components/StyledButton";
 import { FormField } from "../components/StyledForm";
 import {
-  Tabs,
   Descriptions,
   Table,
   Statistic,
@@ -21,6 +20,12 @@ import {
   ErrorMessage,
   ErrorButton,
 } from "../components/StyledPaper";
+import {
+  Tabs,
+  Tab,
+  GeneratedValue,
+  SelectionToolbar,
+} from "../components/StyledComponents";
 import { fetcher } from "../utils";
 import useSWR, { mutate } from "swr";
 import { useSWRConfig } from "swr";
@@ -273,22 +278,22 @@ function StudentDetail({ stuinfo }) {
       </PaperHead>
 
       {/* 选项卡导航 */}
-      <div className="tabs">
-        <button
-          className={`tab ${activeTab === "basic" ? "active" : ""}`}
+      <Tabs>
+        <Tab
+          className={`${activeTab === "basic" ? "active" : ""}`}
           onClick={() => setActiveTab("basic")}
         >
           基本信息
-        </button>
+        </Tab>
         {!isNew && (
-          <button
-            className={`tab ${activeTab === "report" ? "active" : ""}`}
+          <Tab
+            className={`${activeTab === "report" ? "active" : ""}`}
             onClick={() => setActiveTab("report")}
           >
             成绩档案
-          </button>
+          </Tab>
         )}
-      </div>
+      </Tabs>
 
       {/* 标签页内容 */}
       {activeTab === "basic" && (

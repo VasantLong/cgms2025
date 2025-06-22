@@ -2,7 +2,6 @@ import useSWR from "swr";
 import { fetcher } from "../utils";
 import { Link } from "react-router-dom";
 import { StyledTable } from "../components/StyledTable";
-import "./course.css";
 
 function CourseTable(props) {
   const { data: items, error } = useSWR("/api/course/list", fetcher);

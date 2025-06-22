@@ -5,17 +5,17 @@ import { fetcher } from "../utils";
 import { SearchBar } from "@components/SearchBar";
 import "./student-selection.css";
 import { message } from "antd";
-import { StyledTable } from "../components/StyledTable";
 import StyledButton from "../components/StyledButton";
 import {
-  Paper,
-  PaperHead,
-  PaperBody,
-  StatusBar,
-  Message,
-  ErrorMessage,
-  ErrorButton,
-} from "../components/StyledPaper";
+  StudentSelection,
+  SelectionToolbar,
+  SelectionInfo,
+  TableContainer,
+  ListTable,
+  TableHeaderCell,
+  TableDataCell,
+  DisabledCheckbox,
+} from "../components/StyledComponents";
 
 export default function ClassStudentSelection({ classinfo }) {
   useEffect(() => {
@@ -35,12 +35,14 @@ export default function ClassStudentSelection({ classinfo }) {
 
   // 2. 安全获取学生数据：分页获取所有学生
   const studentFetcher = async (url) => {
-    const res = await fetcher(url + `&last_sn=${lastLoadedSn}`); // 需要后端支持
-    return Array.isArray(res) ? res : res?.data || [];
+    const res = await fetcher(url);
+    console.log("studentFetcher response:", res); // 打印响应数据，检查是否正确
+    // 假设后端返回格式为 { data: [...] }，根据实际情况调整
+    return res?.data || [];
   };
   const { data, size, setSize, isValidating, error } = useSWRInfinite(
     (index) => `/api/student/list?page=${index + 1}&page_size=20`,
-    fetcher,
+    studentFetcher,
     {
       dedupingInterval: 30000, // 30秒内相同请求合并
       revalidateOnFocus: false, // 禁止焦点切换时重新请求
@@ -80,7 +82,10 @@ export default function ClassStudentSelection({ classinfo }) {
 
   // 4. 处理数据格式
   const allStudents = useMemo(() => {
-    if (!data) return [];
+    if (!data) {
+      console.log("data is undefined or null");
+      return [];
+    }
     // 合并所有页数据并去重
     const merged = data.flat();
     const uniqueStudents = [];
@@ -92,7 +97,6 @@ export default function ClassStudentSelection({ classinfo }) {
         uniqueStudents.push(student);
       }
     });
-
     return uniqueStudents;
   }, [data]);
 
@@ -324,11 +328,10 @@ export default function ClassStudentSelection({ classinfo }) {
   }, [linkedStudents, isSubmitting, selectedStudents]);
 
   return (
-    <div className="student-selection">
-      {/* 新增搜索和批量操作栏（改进点7） */}
-      <div className="selection-toolbar">
+    <StudentSelection>
+      <SelectionToolbar>
         <SearchBar placeholder="搜索学号或姓名..." onSearch={setSearchTerm} />
-        <div className="selection-info">
+        <SelectionInfo>
           <span>已选: {selectedStudents.size}人</span>
           <StyledButton
             onClick={handleSubmit}
@@ -336,15 +339,15 @@ export default function ClassStudentSelection({ classinfo }) {
           >
             {isSubmitting ? "提交中..." : "保存关联"}
           </StyledButton>
-        </div>
-      </div>
+        </SelectionInfo>
+      </SelectionToolbar>
 
       {/* 虚拟滚动表格容器（改进点8） */}
-      <div className="table-container">
-        <table className="list-table">
+      <TableContainer>
+        <ListTable>
           <thead>
             <tr>
-              <th width="50px">
+              <TableHeaderCell width="50px">
                 <input
                   type="checkbox"
                   checked={
@@ -357,11 +360,11 @@ export default function ClassStudentSelection({ classinfo }) {
                   }
                   onChange={(e) => handleBatchSelect(e.target.checked)}
                 />
-              </th>
-              <th>学号</th>
-              <th>姓名</th>
-              <th>性别</th>
-              <th>状态</th>
+              </TableHeaderCell>
+              <TableHeaderCell>学号</TableHeaderCell>
+              <TableHeaderCell>姓名</TableHeaderCell>
+              <TableHeaderCell>性别</TableHeaderCell>
+              <TableHeaderCell>状态</TableHeaderCell>
             </tr>
           </thead>
           <tbody>
@@ -385,7 +388,7 @@ export default function ClassStudentSelection({ classinfo }) {
                   /* 使用复合key */
                   className={isConflict ? "conflict-row" : ""}
                 >
-                  <td>
+                  <TableDataCell>
                     {isConflict ? (
                       <span
                         className="conflict-tooltip"
@@ -401,11 +404,13 @@ export default function ClassStudentSelection({ classinfo }) {
                         disabled={isConflict}
                       />
                     )}
-                  </td>
-                  <td>{student.stu_no}</td>
-                  <td>{student.stu_name}</td>
-                  <td>{student.gender === "M" ? "男" : "女"}</td>
-                  <td>
+                  </TableDataCell>
+                  <TableDataCell>{student.stu_no}</TableDataCell>
+                  <TableDataCell>{student.stu_name}</TableDataCell>
+                  <TableDataCell>
+                    {student.gender === "M" ? "男" : "女"}
+                  </TableDataCell>
+                  <TableDataCell>
                     {isSubmitting && isSelected
                       ? "保存中..."
                       : isLinked
@@ -413,16 +418,23 @@ export default function ClassStudentSelection({ classinfo }) {
                       : isConflict
                       ? "冲突（不可选）"
                       : "未关联"}
-                  </td>
+                  </TableDataCell>
                 </tr>
               );
             })}
           </tbody>
-        </table>
-      </div>
+        </ListTable>
+      </TableContainer>
 
-      {/* 状态提示（改进点10） */}
-      {isValidating && <div className="loading-indicator">加载中...</div>}
-    </div>
+      {/* 分页加载按钮 */}
+      <div style={{ textAlign: "center", marginTop: "10px" }}>
+        <button
+          onClick={() => setSize((prevSize) => prevSize + 1)}
+          disabled={isValidating}
+        >
+          {isValidating ? "加载中..." : "加载更多"}
+        </button>
+      </div>
+    </StudentSelection>
   );
 }

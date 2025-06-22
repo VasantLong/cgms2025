@@ -1,7 +1,6 @@
 import useSWR from "swr";
 import { fetcher } from "../utils";
 import { Link } from "react-router-dom";
-import "./class.css";
 import { StyledTable } from "../components/StyledTable";
 import {
   Paper,

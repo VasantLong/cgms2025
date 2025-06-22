@@ -1,7 +1,13 @@
 import { Table, InputNumber, Button, message, Modal, Alert } from "antd";
 import { useState, useEffect, useRef } from "react";
 import { fetcher } from "../utils";
-import "./grade-entry.css";
+import {
+  GradeEntryContainer,
+  GradeToolbar,
+  GradeCount,
+  GradeTable,
+  CustomButton,
+} from "../components/StyledGradeEntry";
 import * as XLSX from "xlsx";
 
 export default function GradeEntrySection({ classinfo }) {
@@ -405,26 +411,26 @@ export default function GradeEntrySection({ classinfo }) {
   };
 
   return (
-    <div className="grade-entry-container">
-      <div className="grade-toolbar">
+    <GradeEntryContainer>
+      <GradeToolbar>
         <div>
-          <Button onClick={handleDownloadTemplate}>下载模板</Button>
-          <Button
+          <CustomButton onClick={handleDownloadTemplate}>下载模板</CustomButton>
+          <CustomButton
             type="primary"
             onClick={() => document.getElementById("excel-upload").click()}
           >
             导入Excel
-          </Button>
-          <Button
+          </CustomButton>
+          <CustomButton
             type="primary"
             onClick={handleSave}
             loading={saving}
             disabled={!hasChanges || loading || students.length === 0}
           >
             {saving ? "保存中..." : "批量保存成绩"}
-          </Button>
+          </CustomButton>
         </div>
-        <div className="grade-count">
+        <GradeCount>
           <span>班次: {classinfo.class_no} | </span>
           <span>学生总数: {students.length} | </span>
           <span>已录入: {students.filter((s) => s.grade !== null).length}</span>
@@ -433,8 +439,21 @@ export default function GradeEntrySection({ classinfo }) {
               {autoSaveCountdown}秒后自动保存...
             </span>
           )}
-        </div>
-      </div>
+        </GradeCount>
+      </GradeToolbar>
+      <GradeTable>
+        <Table
+          columns={columns}
+          dataSource={students}
+          loading={loading}
+          pagination={false}
+          rowKey="stu_sn"
+          scroll={{ x: true }}
+          locale={{
+            emptyText: loading ? "加载学生数据中..." : "暂无学生数据",
+          }}
+        />
+      </GradeTable>
 
       {/* 隐藏的文件上传input */}
       <input
@@ -496,19 +515,6 @@ export default function GradeEntrySection({ classinfo }) {
           )}
         </div>
       </Modal>
-
-      <Table
-        columns={columns}
-        dataSource={students}
-        loading={loading}
-        pagination={false}
-        rowKey="stu_sn"
-        scroll={{ x: true }}
-        className="grade-table"
-        locale={{
-          emptyText: loading ? "加载学生数据中..." : "暂无学生数据",
-        }}
-      />
-    </div>
+    </GradeEntryContainer>
   );
 }
