@@ -90,7 +90,8 @@ async def get_class_sequence(
     cou_sn: int, 
     year: int, 
     semester_type: str = Query(..., alias="semesterType"),
-    exclude_class_sn: int | None = Query(None)
+    exclude_class_sn: int | None = Query(None),
+    current_user: User = Depends(get_current_active_user)
 ):  # 使用别名# 新增参数，用于排除当前班次
     
     # 匹配某课程特定学期（比如2023S1）的班次，返回最大的序号
@@ -118,7 +119,10 @@ async def get_class_sequence(
         return {"max_sequence": max_sequence}
 
 @router.get("/api/class/{class_sn}", summary="获取班次详情")
-async def get_class_profile(class_sn) -> Class:
+async def get_class_profile(
+    class_sn,
+    current_user: User = Depends(get_current_active_user)
+) -> Class:
     with dblock() as db:
         db.execute(
             """

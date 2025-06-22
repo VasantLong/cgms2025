@@ -51,13 +51,11 @@ class Student(BaseModel):
         return v
 
 
-# 分页到时候再说
- #   page: int = Query(1, ge=1),
-  #  page_size: int = Query(20, ge=1, le=100
 @router.get("/api/student/list")
 async def get_student_list(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_active_user)
 ) -> dict:
     try:
         with dblock() as db:
@@ -102,7 +100,10 @@ async def get_student_list(
 
 
 @router.get("/api/student/{stu_sn}")
-async def get_student_profile(stu_sn) -> Student:
+async def get_student_profile(
+    stu_sn,
+    current_user: User = Depends(get_current_active_user)
+) -> Student:
     with dblock() as db:
         db.execute(
             """
@@ -122,7 +123,10 @@ async def get_student_profile(stu_sn) -> Student:
 
 
 @router.post("/api/student", status_code=status.HTTP_201_CREATED)
-async def new_student(student: Student) -> Student:
+async def new_student(
+    student: Student,
+    current_user: User = Depends(get_current_active_user)
+) -> Student:
     stu_no = student.stu_no
 
     with dblock() as db:
@@ -160,7 +164,11 @@ async def new_student(student: Student) -> Student:
 
 
 @router.put("/api/student/{stu_sn}")
-async def update_student(stu_sn: int, student: Student):
+async def update_student(
+    stu_sn: int, 
+    student: Student,
+    current_user: User = Depends(get_current_active_user)
+):
     assert student.stu_sn == stu_sn
 
     stu_no = student.stu_no
@@ -177,7 +185,10 @@ async def update_student(stu_sn: int, student: Student):
         )
 
 @router.get("/api/student/{stu_sn}/has-grades", summary="检查学生是否有成绩记录")
-async def student_has_grades(stu_sn: int):
+async def student_has_grades(
+    stu_sn: int,
+    current_user: User = Depends(get_current_active_user)
+):
     with dblock() as db:
         db.execute("""
             SELECT 1 AS has_grade
@@ -190,7 +201,10 @@ async def student_has_grades(stu_sn: int):
 
 
 @router.delete("/api/student/{stu_sn}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_student(stu_sn):
+async def delete_student(
+    stu_sn,
+    current_user: User = Depends(get_current_active_user)
+):
     with dblock() as db:
         # 执行删除操作
         db.execute("DELETE FROM student WHERE sn=%(stu_sn)s", {"stu_sn": stu_sn})
@@ -201,7 +215,6 @@ async def generate_student_report(
     stu_sn: int,
     current_user: User = Depends(get_current_active_user)
 ):
-    validate_jiaomi_role(current_user.user_name)
     
     with dblock() as db:
         # 获取学生基本信息（复用已有查询逻辑）
@@ -254,7 +267,6 @@ async def export_report(
     format: str = 'xlsx',
     current_user: User = Depends(get_current_active_user)
 ):
-    validate_jiaomi_role(current_user.user_name)
     if format not in ('xlsx', 'pdf'):
         raise HTTPException(status_code=400, detail="不支持的导出格式")
 

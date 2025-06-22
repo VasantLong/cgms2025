@@ -3,7 +3,6 @@ import useSWR, { mutate } from "swr";
 import useSWRInfinite from "swr/infinite";
 import { fetcher } from "../utils";
 import { SearchBar } from "@components/SearchBar";
-import "./student-selection.css";
 import { message } from "antd";
 import StyledButton from "../components/StyledButton";
 import {

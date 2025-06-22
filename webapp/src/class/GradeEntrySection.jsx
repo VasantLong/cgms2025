@@ -349,10 +349,13 @@ export default function GradeEntrySection({ classinfo }) {
       if (result.stats.failed === 0) {
         message.success(`成功导入 ${result.stats.success} 条记录`);
         // 导入成功后更新基准数据
-        const updatedStudents = prev.map((s) => {
+        const updatedStudents = students.map((s) => {
           const imported = importData.data.find((i) => i.stu_no === s.stu_no);
           return imported ? { ...s, grade: imported.grade } : s;
         });
+        // 更新学生数据状态
+        setStudents(updatedStudents);
+        // 导入成功后更新基准数据
         initialGrades.current = new Map(
           updatedStudents.map((s) => [s.stu_sn, s.grade])
         );
@@ -361,6 +364,7 @@ export default function GradeEntrySection({ classinfo }) {
           `导入完成，成功 ${result.stats.success} 条，失败 ${result.stats.failed} 条`
         );
       }
+      handleCloseImportModal();
     } catch (error) {
       message.error(`导入失败: ${error.info?.detail || error.message}`);
       handleCloseImportModal();

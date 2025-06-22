@@ -86,7 +86,10 @@ async def get_course_list(
 
 
 @router.get("/api/course/{course_sn}")
-async def get_course_profile(course_sn) -> Course:
+async def get_course_profile(
+    course_sn, 
+    current_user: User = Depends(get_current_active_user)
+) -> Course:
     with dblock() as db:
         db.execute(
             """
@@ -106,10 +109,11 @@ async def get_course_profile(course_sn) -> Course:
 
 
 @router.post("/api/course", status_code=status.HTTP_201_CREATED)
-async def new_course(course: Course) -> Course:
+async def new_course(
+    course: Course, 
+    current_user: User = Depends(get_current_active_user)
+) -> Course:
     course_no = course.course_no
-    #course_dict = course.model_dump()
-    #course_no = course_dict.get('course_no')
     with dblock() as db:
         db.execute(
             """
@@ -138,7 +142,11 @@ async def new_course(course: Course) -> Course:
 
 
 @router.put("/api/course/{course_sn}")
-async def update_course(course_sn: int, course: Course):
+async def update_course(
+    course_sn: int, 
+    course: Course, 
+    current_user: User = Depends(get_current_active_user)
+):
     assert course_sn == course.course_sn
     course_no = course.course_no
     with dblock() as db:
@@ -153,6 +161,9 @@ async def update_course(course_sn: int, course: Course):
 
 
 @router.delete("/api/course/{course_sn}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_course(course_sn):
+async def delete_course(
+    course_sn, 
+    current_user: User = Depends(get_current_active_user)
+):
     with dblock() as db:
         db.execute("DELETE FROM course WHERE sn=%(course_sn)s", {"course_sn": course_sn})
