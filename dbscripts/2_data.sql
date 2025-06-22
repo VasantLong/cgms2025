@@ -100,6 +100,8 @@ INSERT INTO course (sn, no, name, credit, hours) VALUES
 (20035, '50006', '思想政治教育方法论', 2.5, 40),
 (20036, '50007', '中国共产党历史', 2.0, 32);
 
+SELECT setval('seq_course_sn', 20037);
+
 --33
 INSERT INTO class (class_no, name, semester, location, cou_sn) VALUES
 -- 高等数学（课程SN=20000）的两个班次

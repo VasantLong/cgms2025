@@ -54,7 +54,6 @@ function CourseDetail({ courseinfo }) {
 
     const elements = formRef.current.elements;
     let data = {
-      course_sn: courseinfo.course_sn,
       course_no: elements.course_no.value,
       course_name: elements.course_name.value,
       credit: Number(elements.credit.value),
@@ -62,12 +61,13 @@ function CourseDetail({ courseinfo }) {
     };
 
     let url, http_method;
-    if (data.course_sn === null) {
+    if (courseinfo.course_sn === null) {
       // 新建课程记录
       url = `/api/course`;
       http_method = "POST";
     } else {
       // 更新课程记录信息
+      data.course_sn = courseinfo.course_sn;
       url = `/api/course/${courseinfo.course_sn}`;
       http_method = "PUT";
     }

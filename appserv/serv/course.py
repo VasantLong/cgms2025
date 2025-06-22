@@ -12,7 +12,7 @@ from .auth import get_current_active_user, User
 router = APIRouter(tags=["课程管理"])
 
 class Course(BaseModel):
-    course_sn: int | None
+    course_sn: int | None = None
     course_no: str
     course_name: str
     credit: float | None
@@ -113,32 +113,36 @@ async def new_course(
     course: Course, 
     current_user: User = Depends(get_current_active_user)
 ) -> Course:
-    course_no = course.course_no
     with dblock() as db:
+        # 检查课程号是否已存在（避免重复课程号）
         db.execute(
-            """
-            SELECT sn AS course_sn, name AS course_name FROM course
-            WHERE no=%(course_no)s
-            """,
-            dict(course_no=course_no),
+            "SELECT sn FROM course WHERE no = %(course_no)s",
+            {"course_no": course.course_no}
         )
-        record = db.fetchone()
-        if record:
-            raise ConflictError(
-                f"课程号'{course_no}'已被{record.course_name}(#{record.course_sn}占用"
+        if db.fetchone():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"课程号 {course.course_no} 已存在"
             )
 
+        # 插入时不传递 sn，使用数据库自增序列
         db.execute(
             """
             INSERT INTO course (no, name, credit, hours)
-            VALUES(%(course_no)s, %(course_name)s, %(credit)s, %(hours)s) 
-            RETURNING sn""",
-            course.model_dump(),
+            VALUES (%(course_no)s, %(course_name)s, %(credit)s, %(hours)s)
+            RETURNING sn AS course_sn
+            """,
+            course.model_dump()
         )
         row = db.fetchone()
-        course.course_sn = row.sn # type: ignore
-
-    return course
+        if not row:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="插入课程失败，未获取到生成的 sn"
+            )
+        course_data = course.model_dump()
+        course_data["course_sn"] = row.course_sn  # 覆盖原有可能的 null 或重复值
+        return Course(**course_data)
 
 
 @router.put("/api/course/{course_sn}")

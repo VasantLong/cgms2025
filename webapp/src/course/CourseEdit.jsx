@@ -43,9 +43,7 @@ function CourseEdit(props) {
   return (
     <Paper>
       <PaperHead>
-        <h3>
-          {`课程信息：${courseinfo.course_name} (#${courseinfo.course_sn})`}
-        </h3>
+        <h3>{`课程信息：${courseinfo.course_name}`}</h3>
       </PaperHead>
       <PaperBody>
         <CourseDetail courseinfo={courseinfo} />
