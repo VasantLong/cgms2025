@@ -424,16 +424,6 @@ export default function ClassStudentSelection({ classinfo }) {
           </tbody>
         </ListTable>
       </TableContainer>
-
-      {/* 分页加载按钮 */}
-      <div style={{ textAlign: "center", marginTop: "10px" }}>
-        <button
-          onClick={() => setSize((prevSize) => prevSize + 1)}
-          disabled={isValidating}
-        >
-          {isValidating ? "加载中..." : "加载更多"}
-        </button>
-      </div>
     </StudentSelection>
   );
 }

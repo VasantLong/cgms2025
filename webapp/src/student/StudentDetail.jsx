@@ -19,6 +19,7 @@ import {
   Message,
   ErrorMessage,
   ErrorButton,
+  PaperFooter,
 } from "../components/StyledPaper";
 import {
   Tabs,
@@ -350,17 +351,8 @@ function StudentDetail({ stuinfo }) {
                 disabled={!isNew} // 仅新增模式可编辑
               />
             </FormField>
-            <FormField>
-              <label>专业: </label>
-              <input
-                type="text"
-                name="major"
-                onChange={checkChange}
-                disabled={!isNew}
-              />
-            </FormField>
           </form>
-          <div className="paper-footer">
+          <PaperFooter>
             <div className="btns">
               <StyledButton onClick={deleteAction} disabled={isBusy}>
                 删除
@@ -369,7 +361,7 @@ function StudentDetail({ stuinfo }) {
                 保存
               </StyledButton>
             </div>
-          </div>
+          </PaperFooter>
         </PaperBody>
       )}
       {!isNew && activeTab === "report" && (

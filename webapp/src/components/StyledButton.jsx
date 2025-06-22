@@ -15,11 +15,24 @@ const StyledButton = styled.button`
   letter-spacing: 0.1em;
   user-select: none;
   cursor: pointer;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+
+  &:hover {
+    transform: translateY(-1px); // 悬停时上移
+    background-color: hsl(329, 45%, 30%); // 悬停时颜色变深
+    border-color: hsl(329, 45%, 30%);
+  }
 
   &:disabled {
     background-color: hsl(329, 45%, 80%);
     border-color: hsl(329, 45%, 80%);
     cursor: not-allowed;
+    box-shadow: none; // 禁用时移除阴影
+  }
+
+  &:active {
+    transform: translateY(1px); // 点击时下移
   }
 
   & > a:visited,
@@ -45,6 +58,9 @@ const StyledButton = styled.button`
     &:focus {
       outline: none;
     }
+  }
+
+  &-& {
   }
 `;
 

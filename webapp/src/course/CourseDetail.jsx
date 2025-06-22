@@ -13,6 +13,7 @@ import {
   ErrorButton,
 } from "../components/StyledPaper";
 import StyledButton from "../components/StyledButton";
+import { message, Modal } from "antd";
 
 function CourseDetail({ courseinfo }) {
   const formRef = useRef(null);
@@ -84,7 +85,7 @@ function CourseDetail({ courseinfo }) {
       });
 
       if (courseinfo.course_sn === null) {
-        navigate(`/course/${response.course_sn}/edit`);
+        navigate(`/course/${response.course_sn}`);
         return;
       }
     } catch (error) {
@@ -96,15 +97,43 @@ function CourseDetail({ courseinfo }) {
 
   const deleteAction = async () => {
     try {
-      setBusy(true);
-      await fetcher(`/api/course/${courseinfo.course_sn}`, {
-        method: "DELETE",
-      });
-      navigate("/course/list");
+      setBusy(true); // 开始删除操作，设置为忙
+
+      // 检查课程是否有相关引用（如被班次引用）
+      const { has_references } = await fetcher(
+        `/api/course/${courseinfo.course_sn}/has-references`
+      );
+      if (has_references) {
+        message.error("该课程有相关引用，不能删除");
+        return;
+      } else {
+        // 发送删除请求前给出确认提示
+        const confirmResult = await new Promise((resolve) => {
+          Modal.confirm({
+            title: "警告",
+            content: "该操作不可逆，请谨慎确认，是否继续删除？",
+            okText: "确认删除",
+            cancelText: "取消",
+            onOk: () => resolve(true),
+            onCancel: () => resolve(false),
+          });
+        });
+
+        if (!confirmResult) {
+          return;
+        }
+        // 使用 fetcher 函数发送删除请求
+        await fetcher(`/api/course/${courseinfo.course_sn}`, {
+          method: "DELETE",
+        });
+        message.success("课程删除成功");
+        navigate("/course/list");
+      }
     } catch (error) {
-      console.error(error);
+      message.error(error.info?.detail || error.message);
+      setActionError(error.info?.detail || error.message);
     } finally {
-      setBusy(false);
+      setBusy(false); // 动作结束，设置为非忙
     }
   };
 

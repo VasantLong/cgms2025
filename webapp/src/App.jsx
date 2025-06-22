@@ -28,7 +28,7 @@ function App() {
           <Route path="/course" element={<CourseHome />}>
             <Route path="list" element={<CourseList />} />
             <Route path="new" element={<CourseNew />} />
-            <Route path=":courseSn/edit" element={<CourseEdit />} />
+            <Route path=":courseSn" element={<CourseEdit />} />
           </Route>
           <Route path="/grade" element={<GradeHome />}>
             <Route path="list" element={<GradeList />} />

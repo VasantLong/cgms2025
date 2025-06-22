@@ -3,7 +3,7 @@ from dataclasses import asdict
 from fastapi import status, APIRouter, Query, Depends, HTTPException
 from fastapi_cache.decorator import cache
 import datetime as dt
-
+from psycopg.errors import ForeignKeyViolation
 from pydantic import BaseModel, field_validator
 from .config import app, dblock
 from .error import ConflictError, InvalidError
@@ -37,7 +37,7 @@ class Course(BaseModel):
         return v
 
 @router.get("/api/course/list", summary="获取课程列表")
-@cache(expire=300)  # 添加5分钟缓存
+#@cache(expire=300)  # 添加5分钟缓存
 async def get_course_list(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -159,6 +159,26 @@ async def update_course(
             course.model_dump(),
         )
 
+@router.get("/api/course/{course_sn}/has-references")
+async def course_has_references(
+    course_sn: int,
+    current_user: User = Depends(get_current_active_user)
+):
+    with dblock() as db:
+        # 检查课程是否被班次引用
+        db.execute(
+            """
+            SELECT 1 AS has_references
+            FROM class
+            WHERE cou_sn = %(course_sn)s
+            LIMIT 1
+            """,
+            dict(course_sn=course_sn)
+        )
+        row = db.fetchone()
+
+    has_references = row is not None
+    return {"has_references": has_references}
 
 @router.delete("/api/course/{course_sn}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_course(
@@ -166,4 +186,10 @@ async def delete_course(
     current_user: User = Depends(get_current_active_user)
 ):
     with dblock() as db:
-        db.execute("DELETE FROM course WHERE sn=%(course_sn)s", {"course_sn": course_sn})
+        try:
+            db.execute("DELETE FROM course WHERE sn=%(course_sn)s", {"course_sn": course_sn})
+        except ForeignKeyViolation:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"课程(sn={course_sn}) 被班次引用，不能删除"
+            )
