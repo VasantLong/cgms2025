@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 import "./student.css";
 import useSWR from "swr";
 import React, { useState } from "react";
-import { Table, Pagination } from "antd";
 import StyledButton from "../components/StyledButton";
 import { StyledTable } from "../components/StyledTable";
 import {
@@ -17,6 +16,11 @@ import {
   ErrorMessage,
   ErrorButton,
 } from "../components/StyledPaper";
+import {
+  PaginationContainer,
+  PaginationButton,
+  PaginationSelect,
+} from "../components/StyledComponents";
 
 function formatGender(v) {
   if (v === "M") return "男";
@@ -32,7 +36,6 @@ function StudentTable(props) {
     `/api/student/list?page=${currentPage}&page_size=${pageSize}`,
     fetcher
   );
-  //const items = data;
 
   const items = data && Array.isArray(data.data) ? data.data : [];
   const total = data ? data.total : 0;
@@ -95,33 +98,33 @@ function StudentTable(props) {
         </tbody>
       </StyledTable>
 
-      <div className="pagination">
-        <StyledButton
+      <PaginationContainer>
+        <PaginationButton
           onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
           disabled={currentPage === 1}
         >
           上一页
-        </StyledButton>
+        </PaginationButton>
         <span>
           第 {currentPage} 页，共 {totalPages} 页
         </span>
-        <select
+        <PaginationSelect
           value={pageSize}
           onChange={(e) => handlePageSizeChange(Number(e.target.value))}
         >
           <option value="10">10</option>
           <option value="20">20</option>
           <option value="50">50</option>
-        </select>
-        <StyledButton
+        </PaginationSelect>
+        <PaginationButton
           onClick={() =>
             handlePageChange(Math.min(totalPages, currentPage + 1))
           }
           disabled={currentPage === totalPages}
         >
           下一页
-        </StyledButton>
-      </div>
+        </PaginationButton>
+      </PaginationContainer>
     </PaperBody>
   );
 }

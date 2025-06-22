@@ -109,3 +109,52 @@ export const ConflictTooltip = styled.span`
 export const ConflictRow = styled.tr`
   background-color: #fff2f0;
 `;
+
+// 分页容器样式
+export const PaginationContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+  justify-content: center;
+`;
+
+// 分页按钮样式
+export const PaginationButton = styled.button`
+  padding: 6px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  background-color: #fff;
+  cursor: pointer;
+  transition: all 0.3s;
+
+  &:hover {
+    color: hsl(329, 45%, 38%);
+    border-color: hsl(329, 45%, 38%);
+  }
+
+  &:disabled {
+    color: rgba(0, 0, 0, 0.25);
+    border-color: #d9d9d9;
+    background-color: #f5f5f5;
+    cursor: not-allowed;
+  }
+`;
+
+// 分页选择框样式
+export const PaginationSelect = styled.select`
+  padding: 6px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  background-color: #fff;
+  cursor: pointer;
+  transition: all 0.3s;
+
+  &:focus {
+    outline: none;
+    border-color: hsl(329, 45%, 38%);
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+  }
+`;
+
+// ... 已有代码 ...

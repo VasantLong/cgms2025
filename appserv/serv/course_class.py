@@ -38,24 +38,51 @@ def validate_jiaomi_role(username: str):
 
 @router.get("/api/class/list", summary="获取班次列表")
 async def get_class_list(
-    course_sn: int = Query(None),  # 新增过滤参数
+    course_sn: int = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_active_user)
-):
-    with dblock() as db:
-        base_query = """
-            SELECT cl.sn AS class_sn, cl.class_no, cl.name, 
-                   cl.semester, cl.location, c.name AS course_name
-            FROM class cl
-            JOIN course c ON cl.cou_sn = c.sn
-        """
-        params = {}
-        if course_sn:
-            base_query += " WHERE cl.cou_sn = %(course_sn)s"
-            params["course_sn"] = course_sn
+) -> dict:
+    try:
+        with dblock() as db:
+            offset = (page - 1) * page_size
+            base_query = """
+                SELECT COUNT(*) AS total
+                FROM class cl
+                JOIN course c ON cl.cou_sn = c.sn
+            """
+            params = {}
+            if course_sn:
+                base_query += " WHERE cl.cou_sn = %(course_sn)s"
+                params["course_sn"] = course_sn
             
-        base_query += " ORDER BY cl.semester DESC, cl.class_no"
-        db.execute(base_query, params)
-        return [asdict(row) for row in db]
+            db.execute(base_query, params)
+            total_row = db.fetchone()
+            total = total_row.total if total_row and hasattr(total_row, "total") else 0
+
+            base_query = """
+                SELECT cl.sn AS class_sn, cl.class_no, cl.name, 
+                       cl.semester, cl.location, c.name AS course_name
+                FROM class cl
+                JOIN course c ON cl.cou_sn = c.sn
+            """
+            if course_sn:
+                base_query += " WHERE cl.cou_sn = %(course_sn)s"
+            base_query += " ORDER BY cl.semester DESC, cl.class_no"
+            base_query += " LIMIT %(page_size)s OFFSET %(offset)s"
+            params["page_size"] = page_size
+            params["offset"] = offset
+
+            db.execute(base_query, params)
+            result = db.fetchall()
+            classes = [asdict(row) for row in result]
+
+            return {
+                "data": classes,
+                "total": total
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # 获取指定课程在特定学年学期下的最新班次序号
 @router.get("/api/class/sequence", summary="获取最新班次序号")

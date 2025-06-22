@@ -1,7 +1,7 @@
 import asyncio
 from dataclasses import asdict
 from datetime import datetime
-from fastapi import HTTPException, APIRouter, status, Depends, UploadFile, File
+from fastapi import HTTPException, APIRouter, status, Depends, UploadFile, File, Query
 from typing import List
 from pydantic import BaseModel, field_validator
 from .config import dblock
@@ -54,35 +54,56 @@ class GradeQueryParams(BaseModel):
     course_sn: int | None = None
     class_sn: int | None = None
     semester: str | None = None
-
-# 在grade.py添加测试路由
-@router.get("/api/debug/test")
-async def debug_test():
-    with dblock() as db:
-        db.execute("SELECT * FROM class_grade")
-        return {"count": len(list(db)), "first_5": list(db)[:5]}
+    page: int = Query(1, ge=1)
+    page_size: int = Query(20, ge=1, le=100)
     
-@router.get("/api/grade/list")
-async def get_grade_list() -> list[dict]:
-    with dblock() as db:
-        db.execute("""
-        SELECT 
-            g.id AS grade_sn,
-            g.stu_sn AS stu_sn, 
-            cl.cou_sn AS course_sn,
-            s.name AS stu_name, 
-            c.name AS course_name, 
-            g.grade AS grade
-        FROM class_grade AS g
-            INNER JOIN student AS s ON g.stu_sn = s.sn
-            INNER JOIN class AS cl ON g.class_sn = cl.sn
-            INNER JOIN course AS c ON cl.cou_sn = c.sn
-        ORDER BY g.stu_sn, cl.cou_sn;       
-        """)
+@router.get("/api/grade/list", summary="获取成绩列表")
+async def get_grade_list(
+    params: GradeQueryParams = Depends(),
+    current_user: User = Depends(get_current_active_user)
+) -> dict:
+    try:
+        with dblock() as db:
+            # 查询总记录数
+            db.execute("""
+                SELECT COUNT(*) AS total 
+                FROM class_grade AS g
+                INNER JOIN student AS s ON g.stu_sn = s.sn
+                INNER JOIN class AS cl ON g.class_sn = cl.sn
+                INNER JOIN course AS c ON cl.cou_sn = c.sn
+            """)
+            total_row = db.fetchone()
+            total = total_row.total if total_row else 0
+            # 计算偏移量
+            offset = (params.page - 1) * params.page_size
+
+
+            db.execute("""
+                SELECT 
+                    g.id AS grade_sn,
+                    g.stu_sn AS stu_sn, 
+                    cl.cou_sn AS course_sn,
+                    s.name AS stu_name, 
+                    c.name AS course_name, 
+                    g.grade AS grade
+                FROM class_grade AS g
+                    INNER JOIN student AS s ON g.stu_sn = s.sn
+                    INNER JOIN class AS cl ON g.class_sn = cl.sn
+                    INNER JOIN course AS c ON cl.cou_sn = c.sn
+                ORDER BY g.stu_sn, cl.cou_sn
+                LIMIT %(page_size)s OFFSET %(offset)s
+                """,
+                {"page_size": params.page_size, "offset": offset})
         
-        rows = db.fetchall()  # 使用fetchall避免游标问题
-        data = [asdict(row) for row in rows]  # 转换为字典列表
-    return data
+            rows = db.fetchall()  # 使用fetchall避免游标问题
+            data = [asdict(row) for row in rows]  # 转换为字典列表
+
+        return {
+            "data": data,
+            "total": total
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/api/grade/student/{stu_sn}/course/{course_sn}")
@@ -410,35 +431,66 @@ async def query_grades(
     params: GradeQueryParams = Depends(),
     current_user: User = Depends(get_current_active_user)
 ):
-    with dblock() as db:
-        base_query = """
-            SELECT 
-                g.id AS grade_sn,
-                g.stu_sn,
-                s.name AS stu_name,
-                c.sn AS course_sn,
-                c.name AS course_name,
-                cl.class_no,
-                g.grade
-            FROM class_grade g
-            JOIN student s ON g.stu_sn = s.sn
-            JOIN class cl ON g.class_sn = cl.sn
-            JOIN course c ON cl.cou_sn = c.sn
-            WHERE 1=1
-        """
-        conditions = []
-        params_dict = params.model_dump()
-        
-        if params.course_sn:
-            conditions.append("c.sn = %(course_sn)s")
-            # 优先班次查询，若没有班次则用学期
-            if params.class_sn:
-                conditions.append("cl.sn = %(class_sn)s")
-            elif params.semester:
-                conditions.append("cl.semester = %(semester)s")
-        
-        if conditions:
-            base_query += " AND " + " AND ".join(conditions)
-        
-        db.execute(base_query, params_dict)
-        return [asdict(row) for row in db]
+    try:
+        with dblock() as db:
+            where_clauses = []
+            query_params = {}
+
+            if params.course_sn:
+                where_clauses.append("cl.cou_sn = %(course_sn)s")
+                query_params["course_sn"] = params.course_sn
+
+                if params.class_sn:
+                    where_clauses.append("g.class_sn = %(class_sn)s")
+                    query_params["class_sn"] = params.class_sn
+
+                elif params.semester:
+                    where_clauses.append("cl.semester = %(semester)s")
+                    query_params["semester"] = params.semester
+
+            where_condition = " AND ".join(where_clauses) if where_clauses else "1=1"
+
+            # 查询总记录数
+            count_query = f"""
+                SELECT COUNT(*) as total 
+                FROM class_grade AS g
+                    INNER JOIN student AS s ON g.stu_sn = s.sn
+                    INNER JOIN class AS cl ON g.class_sn = cl.sn
+                    INNER JOIN course AS c ON cl.cou_sn = c.sn
+                WHERE {where_condition}
+            """
+            db.execute(count_query, query_params)
+            total_row = db.fetchone()
+            total = total_row.total if total_row else 0
+
+            # 计算偏移量
+            offset = (params.page - 1) * params.page_size
+                # 查询当前页数据
+            data_query = f"""
+                SELECT 
+                    g.id AS grade_sn,
+                    g.stu_sn AS stu_sn, 
+                    cl.cou_sn AS course_sn,
+                    s.name AS stu_name, 
+                    c.name AS course_name, 
+                    g.grade AS grade
+                FROM class_grade AS g
+                    INNER JOIN student AS s ON g.stu_sn = s.sn
+                    INNER JOIN class AS cl ON g.class_sn = cl.sn
+                    INNER JOIN course AS c ON cl.cou_sn = c.sn
+                WHERE {where_condition}
+                LIMIT %(page_size)s OFFSET %(offset)s
+            """
+            query_params["page_size"] = params.page_size
+            query_params["offset"] = offset
+
+            db.execute(data_query, query_params)
+            rows = db.fetchall()
+            data = [asdict(row) for row in rows]
+
+            return {
+                "data": data,
+                "total": total
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

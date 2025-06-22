@@ -42,23 +42,47 @@ async def get_course_list(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_active_user)
-):
-    offset = (page - 1) * page_size
-    with dblock() as db:
-        db.execute("""
-            SELECT 
-                c.sn AS course_sn,
-                c.no AS course_no,
-                c.name AS course_name,
-                c.credit,
-                c.hours
-            FROM course AS c
-            ORDER BY c.no
-            LIMIT %(limit)s OFFSET %(offset)s
-            """,
-            {"limit": page_size, "offset": offset}
-        )
-        return [asdict(row) for row in db]
+) -> dict:
+    try:
+        with dblock() as db:
+            # 计算偏移量
+            offset = (page - 1) * page_size
+
+            # 查询总记录数
+            db.execute("SELECT COUNT(*) AS total FROM course")
+            total_row = db.fetchone()
+            total = total_row.total if total_row and hasattr(total_row, "total") else 0
+
+            # 查询当前页数据
+            db.execute("""
+                    SELECT sn AS course_sn, 
+                        no AS course_no, 
+                        name AS course_name, 
+                        credit, 
+                        hours 
+                    FROM course
+                    LIMIT %(page_size)s OFFSET %(offset)s
+                    """, 
+                    {"page_size": page_size, "offset": offset})
+            result = db.fetchall()
+
+            courses = [
+                {
+                    "course_sn": row.course_sn,
+                    "course_no": row.course_no,
+                    "course_name": row.course_name,
+                    "credit": row.credit,
+                    "hours": row.hours
+                }
+                for row in result
+            ]
+
+            return {
+                "data": courses,
+                "total": total
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/api/course/{course_sn}")
