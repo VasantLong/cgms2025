@@ -117,7 +117,9 @@ function ClassDetail({ classinfo }) {
     const fetchCourseList = async () => {
       try {
         // 使用 fetcher 函数获取课程列表
-        const data = await fetcher("/api/course/list");
+        const response = await fetcher("/api/course/list");
+        // 假设响应数据结构为 { data: [...], total: ... }
+        const data = response.data || [];
         setCourses(Array.isArray(data) ? data : []);
         // 确保在数据加载后设置初始值
         if (!isNew) {

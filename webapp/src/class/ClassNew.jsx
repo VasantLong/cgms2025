@@ -1,4 +1,13 @@
 import ClassDetail from "./ClassDetail";
+import {
+  Paper,
+  PaperHead,
+  PaperBody,
+  StatusBar,
+  Message,
+  ErrorMessage,
+  ErrorButton,
+} from "../components/StyledPaper";
 
 function ClassNew(props) {
   let classinfo = {
@@ -6,9 +15,9 @@ function ClassNew(props) {
   };
 
   return (
-    <div className="paper">
+    <Paper>
       <ClassDetail classinfo={classinfo} />
-    </div>
+    </Paper>
   );
 }
 
