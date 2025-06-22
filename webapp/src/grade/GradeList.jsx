@@ -180,7 +180,7 @@ function GradeList(props) {
             className="stats-info"
             style={{ margin: "12px 0", color: "#666" }}
           >
-            共查询到 {gradeItems.length} 条成绩
+            共查询到 {total} 条成绩
           </div>
         )}
 
